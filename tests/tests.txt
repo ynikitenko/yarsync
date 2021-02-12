@@ -1,0 +1,18 @@
+## Examples of tests to be checked.
+
+push: never changes the source (this directory), except for the log update.
+pull: never changes the source (that directory). Maybe updates log there?
+sync: doesn't delete files, only appends to SRC and DEST (and what about commits?)
+-- it seems I don't need sync. I needed push/pull --new.
+
+log, commit don't change the working directory.
+help doesn't change anything.
+
+Seems I don't understand well how commits are managed.
+
+Commits:
+-- help to prevent updates from older repositories.
+--- In fact it's safe enough, since commits are preserved (but still).
+- help to understand which files are not deleted, but moved (via hard links).
+- maybe refuse to push/pull without unfinished commits? A flag for that.
+-- no, in fact it's useful to pull other data (with --new), then create a commit.

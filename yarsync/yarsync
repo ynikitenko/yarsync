@@ -1,0 +1,27 @@
+#!/usr/bin/python
+
+import argparse
+import sys
+
+from yarsync import YARsync
+
+
+if __name__ == "__main__":
+    # parse arguments
+    try:
+        ys = YARsync(sys.argv)
+    except (argparse.ArgumentError, argparse.ArgumentTypeError, SystemExit) \
+           as err:
+        # SystemExit can raise from argparse
+        # and it caused much misunderstanding, see e.g.
+        # https://stackoverflow.com/questions/42249982/systemexit-2-error-when-calling-parse-args
+        # the error itself is printed by argparse
+        sys.exit(7)
+    except OSError:
+        # the error is printed by YARsync, if error output is allowed
+        sys.exit(8)
+
+    # make actual call
+    # this should throw no exceptions
+    returncode = ys()
+    sys.exit(returncode)

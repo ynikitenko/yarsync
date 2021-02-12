@@ -1,0 +1,5 @@
+# development
+pytest
+coverage
+pytest-cov
+pytest-mock
