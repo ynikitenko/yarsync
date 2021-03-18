@@ -1,0 +1,176 @@
+===== Commands ======
+
+== Tasks ==
+- unify COMMITDIR and config_dir. Are they upper or lowercase? Some are not needed (REPONAME).
+- push/pull should use only the most recent synced commit (to reduce the number of hard links for rsync).
++ YS directory should be found from any place.
+- ys show <file|dir> - show commits which own this file. To be sure when you `rm` it.
+- subprocess should actually print rsync output!
+- yarsync checksum <remote>
+  rsync -niaHc /origfolder/ /copyfolder
+  # from https://unix.stackexchange.com/a/313189/89346
+  # Checksums and links to failure rates: https://softwareengineering.stackexchange.com/a/336360/42050
+
+= Code =
+- push and pull should not duplicate code for '-n'.
+
++ 1) Create tests.
++ https://code-maven.com/temporary-files-and-directory-for-pytest
++ 2) Create class, which contains all yarsync options.
++    If it were functions receiving an argument (like dict),
++    it would be less reliable (what if the dict doesn't have all fields needed).
++    Singleton is not needed, I suppose. And easier for testing is a simple object.
+
+== Commit ==
+- Open an editor during commit to create its description.
+
+== Log ==
++ add -r modifier to invert the order of logs.
++ add -n modifier to limit number of commits shown.
+- think about a pager as in git. Think about colors.
+
+== Tests ==
++ directory with bad permissions must be created itself.
+
+===== =====
+
+== Configuration ==
++ .ys must be searched in upper directories (like .mrconfig or .git are).
++ add .ys/host - hold information for accounting during push/pull.
+  -- in fact, sync.txt was added.
++ if copying with the specified path, .ys/config.ini don't have to exist.
++ .ys/rsync-filter don't have to exist.
+
+== Data transfer ==
++ check that log files are transferred with other data.
+
+== Data management ==
+- yarsync rm -r path (remove recursively path from all commits).
+  -i - interactive (default).
+  -f - force (don't ask).
+  -- but commit edition may have unexpected consequences for remote repositories.
+
+== Options ==
+- by default it must be rsync -n. For security. yarsync command is too simple to make an error.
+- make diff not output not tracked directories.
+- same with commit directory.
+
+== Unclear ==
++++ .ys directory can be external and can be passed as a command line option.
+-- need to test that more.
+
+-- not needed. To transfer changes to far remotes is unreliable.
+-- add an option 'mark'. Delete a directory from all repositories and commits (because of wrongly stored).
+-- very unclear
+    - consistent copy and sync (with /).
+    -- not needed.
+    -- sync after a certain commit.
+    -- it seems cool that I can fix commits and syncronize afterwards.
+    - (how to delete all commits after this one?)
+
+== Improvements ==
+- must print rsync error text if there was one.
+- status
+-- would be nice if it could print the size of changes.
+- add check option, which checks which repo is newer. During push/pull it can be called to prevent wrong sync.
+
+== Interface ==
+Path must have trailing slash. Is it so? What would be default, a warning?
+
+== Wrong ==
+-- In fact, we decided to rely on push/pull. 
+If remote doesn't have commits.
+If that is more recent, we copy from there without .ys
+If we are more recent (and there are no commits there not present here), we copy all to there.
+If destination has some other commits, we first sync, then push there.
+
+=== Caveats ===
+- files with ':' in the top directory won't be committed (and probably pushed).
+  -- seems it's hard to deal with them in rsync,
+     https://askubuntu.com/questions/11634/how-can-i-substitute-colons-when-i-rsync-on-a-usb-key
+
+Tips
+====
+List newer files:
+find . -print0 -newer <most-recent-commit>
+
+Hard link using cp (but no rsync filters are available):
+# cp -l is hard link, -a is archive mode, -t specifies the target directory
+cp -al -t <commit_dir_tmp> <files_to_copy...>
+
+The path after shebang in yarsync (not yarsync.py).
+ipython may show more detailed errors, but it has problems with "-m" key.
+"commit -m" is treated as importing a module...
+
+Check remote commits:
+rsync -nr --info=NAME --include=/ --exclude=/*/* <remote>:~/repo/.ys/commits/ .ys/commits/
+# will print out transferred directories (commits).
+
+gzip knows a compression option
+--rsyncable
+(allows only changed files in the gzipped archive to be rsynced)
+
+Rsync notes
+===========
+filter files: . (merge) files are on local side. It must be always present locally!
+: (per directory) are on remote side.
+Beware of spaces after file names in includes/excludes! They mustn't be there!!
+
+Not scalable for a large number of hard links.
+They are filled into memory, and if there is not enough of that, it will copy contents.
+https://serverfault.com/a/207693/251416
+There is a `hardlink` program, which is said to remedy this rather quickly (comment below the link).
+
+Hardlink is very fast. On SSD for the programming/ repo it ran:
+Mode:     real
+Files:    114590
+Linked:   16620 files
+Compared: 0 xattrs
+Compared: 6223 files
+Saved:    66,29 MiB
+Duration: 3,74 seconds
+
+By default rsync transfers symlinks as they are.
+However, git checks the full real path when searching for the .git directory.
+I think this is better. If you are inside a folder that won't be transmitted,
+to ask for the status of a different repository is meaningless (but what about a filtered directory?)
+    You are asking for the status of files in the directory you are in.
+    Or maybe this should raise an error?
+A filtered directory, if it doesn't belong to an unfiltered repo, is more a part of this repo.
+Status can show that this directory is filtered / symlink.
+
+old
+---
+Local (L), Remote (R).
+File a/A present in L, but missing in R.
+If a is updated on R more recently than on L, then L:a/A should be deleted.
+True negative: create R:a/B, remove R:a/B.
+*A* timestamps can be meaningless (creation time may be missing and modification time could come from remote).
+
+
+old
+---
+== requirements ==
+find is written in C.
+That's why we use that.
+
+== to do ==
+write output and stderr on the fly
+
+hostname
+if found in some global config file or in .sync (but not synced then) - use that,
+if command is available, use that,
+otherwise require from command line
+
+We store host/path as config file.
+We store logs in corresponding logs.
+
+== config ==
+maybe path should be common? Differences in subsections (but what is the main subsection then).
+
+== Alternatives ==
+rsnapshot is nice.
+Commercial.
+http://www.t-arn.com/software/TRsync_readme.htm
+Project abandoned, no documentation
+https://github.com/mrasskazov/trsync
