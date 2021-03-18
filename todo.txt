@@ -110,6 +110,15 @@ gzip knows a compression option
 --rsyncable
 (allows only changed files in the gzipped archive to be rsynced)
 
+Copy directory structure (without files)
+rsync -a --include='*/' --exclude='*' source/ destination/
+"Basically, first include all directories, then exclude all files."
+or
+rsync -a -f"+ */" -f"- *" source/ destination/
+or
+rsync -a -f"-! */" source/ destination/
+https://stackoverflow.com/a/40586240/952234
+
 Rsync notes
 ===========
 filter files: . (merge) files are on local side. It must be always present locally!
