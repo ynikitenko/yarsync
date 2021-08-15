@@ -510,6 +510,7 @@ class YARsync():
             host = self._configdict[remote]["host"]
         except KeyError:
             host = remote
+        return host
 
     def _get_remote_path(self, remote=None):
         remote_ = collections.namedtuple("remote", ["host", "destpath", "name"])
@@ -736,6 +737,7 @@ class YARsync():
         # If a file is new, it won't be in remote commits.
         # -H preserves hard links in one set of files (but see the note in todo.txt)
         remote = self._args._remote
+
         try:
             host, destpath, remote = self._get_remote_path(remote)
         except (KeyError, OSError):
@@ -745,6 +747,7 @@ class YARsync():
             if destpath[-1] != os.sep:
                 destpath += os.sep  # '/' for Linux
 
+        # print("host, destpath, remote =", host, destpath, remote)
         new = self._args.new
         # if there exists .ys/rsync-filter, command will need quotes,
         # but they are present there
