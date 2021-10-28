@@ -3,12 +3,15 @@
 from __future__ import print_function
 
 import argparse
+import collections
 import configparser
 import datetime
 # for user name
 import getpass
+import io
 import json
 import os
+import re
 # for host name
 # import platform
 import socket
@@ -27,6 +30,52 @@ def _is_commit(file_name):
     except (TypeError, ValueError):
         return False
     return True
+
+
+# copied from https://github.com/DiffSK/configobj/issues/144#issuecomment-347019778
+# with some modifications.
+# Another, and maybe a better option, would be
+# config = ConfigParser(os.environ)
+# config.read('config.ini')
+# where it's probably not necessary to add all the ENV to the config,
+# but only those variables that occur in the config file.
+def _substitute_env(content):
+    """Reads filename, substitutes environment variables and returns a file-like
+     object of the result.
+
+    Substitution maps text like "$FOO" for the environment variable "FOO".
+    """
+
+    def lookup(match):
+        """Replaces a match like $FOO with the env var FOO.
+        """
+        key = match.group(2)
+        if key not in os.environ:
+            # unset variables return unchanged (with $)
+            return match.group(1)
+            # raise Exception("Config env var '{key}' not set".format(key))
+        return os.environ.get(key)
+
+    # todo: allow more sophisticated variables, like ${VAR}
+    # (and that's all), should be an OR of this and 
+    # r'(\${(\w+)})'), untested.
+    # Not sure it's needed: why such complications to a config file?..
+    pattern = re.compile(r'(\$(\w+))')
+    replaced = pattern.sub(lookup, content)
+
+    try:
+        result = io.StringIO(replaced)
+    except TypeError:  # Python2
+        result = io.StringIO(unicode(replaced, "utf-8"))
+    return result
+
+
+def _mkhostpath(host, path):
+    if not host:
+        # for empty host name return just path
+        # (this is localhost)
+        return path
+    return host + ":" + path
 
 
 class YARsync():
@@ -456,9 +505,18 @@ class YARsync():
         # print("filter_str: '{}'".format(filter_str))
         return (filter_, filter_str)
 
+    def _get_remote_host(self, remote):
+        try:
+            host = self._configdict[remote]["host"]
+        except KeyError:
+            host = remote
+        return host
+
     def _get_remote_path(self, remote=None):
+        remote_ = collections.namedtuple("remote", ["host", "destpath", "name"])
         configdict = self._configdict
         if not remote:
+            # todo: to avoid confusion, rename "host" here to "remote"
             remote = configdict["default"]["host"]
             # todo: this is wrong!! This doesn't give the first section, helas.
             # see ~/programming config. Wrong section is chosen.
@@ -466,10 +524,11 @@ class YARsync():
             # remote = defaultsect[0]
         # print(configdict[remote])
         destpath = configdict[remote]["path"]
+        host = self._get_remote_host(remote)
         # destpath = "{}:{}".format(remote, configdict[remote]["path"])
         if not destpath.endswith('/'):
             destpath += '/'
-        return (remote, destpath)
+        return remote_(host, destpath, remote)
 
     def _get_sync_directory(self):
         sync_dir = ".ys"
@@ -678,22 +737,22 @@ class YARsync():
         # If a file is new, it won't be in remote commits.
         # -H preserves hard links in one set of files (but see the note in todo.txt)
         remote = self._args._remote
+
         try:
-            remote, destpath = self._get_remote_path(remote)
+            host, destpath, remote = self._get_remote_path(remote)
         except (KeyError, OSError):
             # a local path. Though we can't be sure the host is called localhost.
             remote, destpath = None, remote
+            host = ""
             if destpath[-1] != os.sep:
                 destpath += os.sep  # '/' for Linux
 
+        # print("host, destpath, remote =", host, destpath, remote)
         new = self._args.new
         # if there exists .ys/rsync-filter, command will need quotes,
         # but they are present there
         filter_, filter_str = self._get_filter()
-        if remote is not None:
-            full_destpath = remote + ":" + destpath
-        else:
-            full_destpath = destpath
+        full_destpath = _mkhostpath(host, destpath)
 
         remote_commits = os.path.join(full_destpath, ".ys", "commits" + '/')
         if self._args.command_name  == "push":
@@ -718,7 +777,7 @@ class YARsync():
         command.extend(filter_)
         command_str += " " + filter_str
         root_path = self.root_dir + "/"
-        if self._args.command_name  == "push":
+        if self._args.command_name == "push":
             command.append(root_path)
             command.append(full_destpath)
             command_str += " {} {}".format(root_path, full_destpath)
@@ -752,14 +811,18 @@ class YARsync():
         return 0
 
     def _read_config(self):
-        def mkhostpath(host, path):
-            return host + ":" + path
+
+        # substitute environmental variables (if present and available)
+        # todo: many problems. Env variables don't have to be available
+        # for all sections. On the other hand, they must be present
+        # for the options currently used.
+        with open(self.CONFIGFILE, "r") as conf_file:
+            subst_lines = _substitute_env(conf_file.read()).getvalue()
 
         config = configparser.ConfigParser()
-        fileread = config.read(self.CONFIGFILE)
-        if not fileread:
-            # in Python3 it is FileNotFoundError, which is a subclass of OSError
-            raise OSError("could not find {}".format(self.CONFIGFILE))
+        # ConfigParser.read_string
+        # is undocumented in Python2, but present!
+        config.read_string(subst_lines)
 
         # not sure whether I need this
         config["DEFAULT"]["srcpath"] = self.root_dir  # "./"
@@ -770,9 +833,17 @@ class YARsync():
             configdict[section] = sectiond
             if section == "default":
                 continue
-            remote = section
+
+            try:
+                # all local repositories must have an entry "host"
+                # (can be empty or localhost, or equivalent)
+                host = sectiond["host"]
+            except KeyError:
+                # sections for remotes can be named after their hosts
+                host = section
+            # host = self._get_remote_host(section)
             destpath = sectiond["path"]
-            sectiond["destpath"] = mkhostpath(remote, destpath)
+            sectiond["destpath"] = _mkhostpath(host, destpath)
 
         # print all values:
         # configdict = self._configdict

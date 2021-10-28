@@ -52,9 +52,7 @@ def test_init_mixed(mocker):
         call().__exit__(None, None, None)
     ]
     old_calls = m.mock_calls[:]
-    # don't know how to clear the calls
-    # m.mock_calls.clear()
-    # so had to split it into 3 functions
+    # To clear the calls use m.reset_mock()
 
 
 def test_init_non_existent(mocker):
