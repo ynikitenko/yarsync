@@ -1,6 +1,9 @@
 ===== Commands ======
 
 == Tasks ==
+- add (default) group and user change (because otherwise may have problem), like
+  --usermap=yaroslav:yaroslav --groupmap=yaroslav:yaroslav (different group ids)
+  (since rsync v. 3.1.0, https://serverfault.com/a/656494/251416, https://download.samba.org/pub/rsync/NEWS)
 - unify COMMITDIR and config_dir. Are they upper or lowercase? Some are not needed (REPONAME).
 - push/pull should use only the most recent synced commit (to reduce the number of hard links for rsync).
 + YS directory should be found from any place.
