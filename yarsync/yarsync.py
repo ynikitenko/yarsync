@@ -948,8 +948,11 @@ class YARsync():
         )
         stdoutdata, stderrdata = completed_process.communicate()
         returncode = completed_process.returncode
-        missing_commits = [os.path.basename(os.path.dirname(str(dir_, 'utf-8')))
-                           for dir_ in stdoutdata.split()]
+        raw_names = stdoutdata.split()
+        # commit folder can have files from the user
+        # (maybe it should not be allowed: are they transferred at all?..)
+        dirs = (os.path.dirname(str(dir_, 'utf-8')) for dir_ in raw_names)
+        missing_commits = [os.path.basename(dir_) for dir_ in dirs if dir_]
         return missing_commits
 
     def __call__(self):
