@@ -113,7 +113,7 @@ class YARsync():
             "-n", "--dry-run", action="store_true",
             default=False,
             help="print what would be transferred during a real run, "
-                 "but don't make any change"
+                 "but don't make any changes"
         )
         # I think this should work with push, pull, and anything involving rsync
         # (but not init or log or status? Or maybe give a hint what's going on?)

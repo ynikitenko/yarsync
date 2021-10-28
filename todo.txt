@@ -1,6 +1,9 @@
 ===== Commands ======
 
 == Tasks ==
+- create a command "sync", and properly delete old commits (so that they are not restored).
+  Sync should synchronize commits to and from remote, so that one doesn't have to think
+  whether to push or to pull.
 - add (default) group and user change (because otherwise may have problem), like
   --usermap=yaroslav:yaroslav --groupmap=yaroslav:yaroslav (different group ids)
   (since rsync v. 3.1.0, https://serverfault.com/a/656494/251416, https://download.samba.org/pub/rsync/NEWS)
@@ -16,6 +19,7 @@
 
 = Code =
 - push and pull should not duplicate code for '-n'.
+- add a proper pytest hook to set permissions for the directory without permissions.
 
 + 1) Create tests.
 + https://code-maven.com/temporary-files-and-directory-for-pytest

@@ -19,6 +19,7 @@ def test_error():
     os.chdir(TEST_DIR_NO_PERMS)
     ys = YARsync(["yarsync", "init"])
     returncode = ys()
+    print("if this test fails, check that permissions are correct")
     assert returncode == 8
 
 
