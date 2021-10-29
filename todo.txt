@@ -1,11 +1,19 @@
 ===== Commands ======
 
 == Tasks ==
+- create a command "sync", and properly delete old commits (so that they are not restored).
+  Sync should synchronize commits to and from remote, so that one doesn't have to think
+  whether to push or to pull.
+- add (default) group and user change (because otherwise may have problem), like
+  --usermap=yaroslav:yaroslav --groupmap=yaroslav:yaroslav (different group ids)
+  (since rsync v. 3.1.0, https://serverfault.com/a/656494/251416, https://download.samba.org/pub/rsync/NEWS)
 - unify COMMITDIR and config_dir. Are they upper or lowercase? Some are not needed (REPONAME).
 - push/pull should use only the most recent synced commit (to reduce the number of hard links for rsync).
 + YS directory should be found from any place.
 - ys show <file|dir> - show commits which own this file. To be sure when you `rm` it.
-- subprocess should actually print rsync output!
+!
+! subprocess should actually print rsync output!
+!
 - yarsync checksum <remote>
   rsync -niaHc /origfolder/ /copyfolder
   # from https://unix.stackexchange.com/a/313189/89346
@@ -13,6 +21,7 @@
 
 = Code =
 - push and pull should not duplicate code for '-n'.
+- add a proper pytest hook to set permissions for the directory without permissions.
 
 + 1) Create tests.
 + https://code-maven.com/temporary-files-and-directory-for-pytest
