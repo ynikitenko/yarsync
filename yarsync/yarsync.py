@@ -1,7 +1,5 @@
 # Yet Another Rsync
 
-from __future__ import print_function
-
 import argparse
 import collections
 import configparser
@@ -736,6 +734,11 @@ class YARsync():
         # In fact, it is not needed.
         # If a file is new, it won't be in remote commits.
         # -H preserves hard links in one set of files (but see the note in todo.txt)
+
+        _, changed = self._status(check_changed=True)
+        if changed:
+            raise OSError("local repository has uncommited changes")
+
         remote = self._args._remote
 
         try:
@@ -874,7 +877,7 @@ class YARsync():
             for section in self._config.sections():
                 print(section)
 
-    def _status(self):
+    def _status(self, check_changed=False):
         """Print files and directories that were updated more recently
         than last commit.
 
@@ -908,6 +911,12 @@ class YARsync():
         if filter_str:
             command_str += " " + filter_str
 
+        # outbuf option added in Rsync 3.1.0 (28 Sep 2013)
+        # https://download.samba.org/pub/rsync/NEWS#ENHANCEMENTS-3.1.0
+        # from https://stackoverflow.com/a/35775429
+        command.append('--outbuf=L')
+        command_str += " --outbuf=L"
+
         root_path = self.root_dir + "/"
         command_end = [root_path, newest_commit_dir]
         command += command_end
@@ -916,7 +925,18 @@ class YARsync():
         self._print(command_str)
         self._print("# changed since last commit:\n")
 
-        returncode = subprocess.call(command)
+        sp = subprocess.Popen(command, stdout=subprocess.PIPE)
+        # changed means there were actual changes in the working dir
+        changed = False
+        # note that directories may appear to be changed
+        # just because of timestamps (add and remove a file), e.g.
+        # b'.d..t...... ./\n'
+        for line in iter(sp.stdout.readline, b''):
+            if line:
+                changed = True
+            # todo: use terminal encoding.
+            print(line.decode("utf-8"), end='')
+        returncode = sp.returncode
 
         try:
             synced_commit, repo = self._get_last_sync()
@@ -933,6 +953,11 @@ class YARsync():
                                        if cm > synced_commit])
                 self._print("# current repository is {} commits ahead of {}"\
                             .format(n_newer_commits, repo))
+
+        # called from an internal method
+        if check_changed:
+            return (returncode, changed)
+        # called as the main command
         return returncode
 
     def _test_missing_commits(self, from_path, to_path):

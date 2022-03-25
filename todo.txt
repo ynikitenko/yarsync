@@ -1,5 +1,11 @@
 ===== Commands ======
 
+== Repository ==
+- fix problems with read-only test directories (can't switch from devel to master and back!)
+- merge devel into master.
+- Fix README (probably add the output of ys --help)
+- Clean up this file!
+
 == Tasks ==
 - create a command "sync", and properly delete old commits (so that they are not restored).
   Sync should synchronize commits to and from remote, so that one doesn't have to think
