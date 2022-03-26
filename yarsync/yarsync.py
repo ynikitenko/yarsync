@@ -72,11 +72,10 @@ def _substitute_env(content):
 
 
 def _mkhostpath(host, path):
-    if not host:
-        # for empty host name return just path
-        # (this is localhost)
-        return path
-    return host + ":" + path
+    if host:
+        return host + ":" + path
+    # localhost
+    return path
 
 
 class YARsync():
@@ -252,31 +251,32 @@ class YARsync():
         # todo: this file should contain repository name.
         # I think that would be better to move this to config.
         self.REPOFILENAME = "repository.txt"
+        # directory with metadata
         CONFIGDIRNAME = ".ys"
 
-        # directory with sync metadata
-        # $HOME in config_dir works fine,
-        # otherwise could use os.path.expandvars
-        self.config_dir = os.path.expanduser(args.config_dir)
-        self.root_dir = os.path.expanduser(args.root_dir)
-        if self.config_dir or self.root_dir:
-            # paths provided through command line arguments
-            if not args.root_dir or not self.config_dir:
-                parser.error("both --config-dir and --root-dir must be provided")
-        else:
-            if args.command_name in ['init', 'status']:
-                self.config_dir, self.root_dir = CONFIGDIRNAME, "."
+        root_dir = os.path.expanduser(args.root_dir)
+        config_dir = os.path.expanduser(args.config_dir)
+        if not root_dir and not config_dir:
+            if args.command_name == 'init':
+                root_dir = "."
+                config_dir = CONFIGDIRNAME
             else:
                 # search the current directory and its parents
-                self.config_dir, self.root_dir = self._get_sync_directory()
-                if not self.config_dir and not self.root_dir:
-                    self._print_error(
-                        "fatal: no {} configuration {} found".
-                        format(self.NAME, CONFIGDIRNAME)
-                    )
-                    raise OSError(
-                        "{} not found".format(CONFIGDIRNAME)
-                    )
+                try:
+                    root_dir = self._get_root_directory(CONFIGDIRNAME)
+                except OSError as err:
+                    # config dir not found.
+                    raise err
+                config_dir = os.path.join(root_dir, CONFIGDIRNAME)
+        else:
+            # at least one of them is provided.
+            # check that they are both provided
+            if not root_dir or not config_dir:
+                parser.error(
+                    "both --config-dir and --root-dir must be provided"
+                )
+        self.root_dir = root_dir
+        self.config_dir = config_dir
 
         # directory creation mode can be set from:
         # - command line argument
@@ -291,6 +291,8 @@ class YARsync():
         self.LOGDIR = os.path.join(self.config_dir, "logs")
         # REMOTESDIR = os.path.join(self.config_dir, "remotes")
         self.RSYNCFILTER = os.path.join(self.config_dir, "rsync-filter")
+        # this could be a useful configuration, for example
+        # when mounting a local repo and making a commit.
         self.REPOFILE = os.path.join(self.config_dir, self.REPOFILENAME)
         # stores last synchronized commit
         self.SYNCFILENAME = os.path.join(self.config_dir, "sync.txt")
@@ -298,8 +300,6 @@ class YARsync():
         self.DEBUG = True
 
         if args.command_name not in ['init', 'status']:
-            # may be a subtle bug: here we check for CONFIGFILE,
-            # but assume that config_dir exists.
             if not os.path.exists(self.CONFIGFILE):
                 self._print_error(
                     "fatal: no {} configuration {} found".
@@ -394,11 +394,11 @@ class YARsync():
             )
 
         # exclude .ys, otherwise an empty .ys/ will appear in the commit
-        args = ["rsync", "-a", "--link-dest=../../..", "--exclude=/.ys"]
-        full_command_str = " ".join(args)
+        command = ["rsync", "-a", "--link-dest=../../..", "--exclude=/.ys"]
+        full_command_str = " ".join(command)
 
         filter_list, filter_str = self._get_filter(include_commits=False)
-        args.extend(filter_list)
+        command.extend(filter_list)
         if filter_str:
             full_command_str += " " + filter_str
         # the trailing slash is very important for rsync
@@ -407,14 +407,14 @@ class YARsync():
         # However, this may or may not work in cygwin
         # https://stackoverflow.com/a/18797771/952234
         root_dir = self.root_dir + '/'
-        args.append(root_dir)
-        args.append(commit_dir_tmp)
+        command.append(root_dir)
+        command.append(commit_dir_tmp)
         full_command_str += " " + root_dir + " " + commit_dir_tmp
 
         self._print(full_command_str)
-        self._print("args =", args, debug=True)
+        # self._print("command =", command, debug=True)
         completed_process = subprocess.Popen(
-            args,
+            command,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
         # The data read is buffered in memory,
@@ -506,36 +506,45 @@ class YARsync():
         # print("filter_str: '{}'".format(filter_str))
         return (filter_, filter_str)
 
-    def _get_remote_host(self, remote):
-        try:
-            host = self._configdict[remote]["host"]
-        except KeyError:
-            host = remote
-        return host
+    def _get_dest_path(self, dest=None):
+        """Return a pair *(host, destpath)*, where
+        *host* is a real host (its ip/name/etc.) at the destination
+        and *destpath* is a path on that host.
 
-    def _get_remote_path(self, remote=None):
-        remote_ = collections.namedtuple("remote", ["host", "destpath", "name"])
-        configdict = self._configdict
-        if not remote:
-            # todo: to avoid confusion, rename "host" here to "remote"
+        If *host* is not present in the configuration,
+        it is set to localhost.
+        If destination path is missing, `KeyError` is raised.
+        """
+        config = self._configdict
+        if not dest:
             try:
-                remote = configdict["default"]["host"]
+                dest = config["default"]["name"]
             except KeyError:
-                raise ValueError("no default host found in config")
-            # todo: this is wrong!! This doesn't give the first section, helas.
-            # see ~/programming config. Wrong section is chosen.
+                raise KeyError(
+                    'no default destination found in config. '
+                    'Add subsection "default" with name=<default subsection>'
+                )
+            # This doesn't give the first section, helas.
             # defaultsect = list(configdict.items())[0]
-            # remote = defaultsect[0]
-        # print(configdict[remote])
-        destpath = configdict[remote]["path"]
-        host = self._get_remote_host(remote)
-        # destpath = "{}:{}".format(remote, configdict[remote]["path"])
+            # dest = defaultsect[0]
+
+        try:
+            destpath = config[dest]["path"]
+        except KeyError:
+            raise KeyError("destination path must be present "
+                           "in the configuration") from None
+        try:
+            host = config[dest]["host"]
+        except KeyError:
+            # localhost
+            host = ""
+
+        # destpath = "{}:{}".format(dest, configdict[remote]["path"])
         if not destpath.endswith('/'):
             destpath += '/'
-        return remote_(host, destpath, remote)
+        return (host, destpath)
 
-    def _get_sync_directory(self):
-        sync_dir = ".ys"
+    def _get_root_directory(self, sync_dir):
         cur_path = os.getcwd()
         # path without symlinks
         root_path = os.path.realpath(cur_path)
@@ -543,14 +552,16 @@ class YARsync():
             test_path = os.path.join(root_path, sync_dir)
             if os.path.exists(test_path):
                 # without trailing slash
-                # self.root_dir = root_path
-                return (test_path, root_path)
+                return root_path
             if os.path.dirname(root_path) == root_path:
-                # they say this won't work on windows shares, but anyway
+                # won't work on Windows shares with '\\server\share',
+                # but ignore.
                 # https://stackoverflow.com/a/10803459/952234
                 break
             root_path = os.path.dirname(root_path)
-        return ("", "")
+        raise OSError(
+            "configuration directory {} not found".format(sync_dir)
+        )
 
     def _init(self):
         """Initialize default configuration.
@@ -740,27 +751,31 @@ class YARsync():
         # If a file is new, it won't be in remote commits.
         # -H preserves hard links in one set of files (but see the note in todo.txt)
 
-        _, changed = self._status(check_changed=True, verbose=False)
+        returncode, changed = self._status(check_changed=True, verbose=False)
         if changed:
             raise OSError("local repository has uncommited changes")
+        if returncode:
+            raise OSError("could not check for uncommited changes, "
+                          "rsync returned {}".format(returncode))
 
         remote = self._args._remote
 
         try:
-            host, destpath, remote = self._get_remote_path(remote)
-        except (KeyError, OSError):
-            # a local path. Though we can't be sure the host is called localhost.
-            remote, destpath = None, remote
-            host = ""
-            if destpath and destpath[-1] != os.sep:
-                destpath += os.sep  # '/' for Linux
+            host, destpath = self._get_dest_path(remote)
+        except KeyError as err:
+            raise err from None
+            # # a local path. Though we can't be sure the host is called localhost.
+            # remote, destpath = None, remote
+            # host = ""
+            # if destpath and destpath[-1] != os.sep:
+            #     destpath += os.sep  # '/' for Linux
+        full_destpath = _mkhostpath(host, destpath)
 
         # print("host, destpath, remote =", host, destpath, remote)
         new = self._args.new
         # if there exists .ys/rsync-filter, command will need quotes,
         # but they are present there
         filter_, filter_str = self._get_filter()
-        full_destpath = _mkhostpath(host, destpath)
 
         command = ["rsync", "-avHP"]
         if self._args.dry_run:
@@ -781,7 +796,7 @@ class YARsync():
             command.append(root_path)
             command_str += " {} {}".format(full_destpath, root_path)
 
-        self._print("#", command, debug=True)
+        # self._print("#", command, debug=True)
         self._print("#", command_str)
 
         # todo: do we need all missing commits?
