@@ -762,21 +762,6 @@ class YARsync():
         filter_, filter_str = self._get_filter()
         full_destpath = _mkhostpath(host, destpath)
 
-        remote_commits = os.path.join(full_destpath, ".ys", "commits" + '/')
-        if self._args.command_name  == "push":
-            missing_commits = self._test_missing_commits(remote_commits,
-                                                         self.COMMITDIR + '/')
-        else:
-            missing_commits = self._test_missing_commits(self.COMMITDIR + '/',
-                                                         remote_commits)
-
-        # todo: do we need that? We should look at only the most recent commits.
-        if missing_commits:
-            raise OSError("destination has commits missing on source: {}"\
-                          .format(", ".join(missing_commits)) +
-                          ", synchronize these commits first"
-                         )
-
         command = ["rsync", "-avHP"]
         if self._args.dry_run:
             command += ["-n"]
@@ -798,6 +783,22 @@ class YARsync():
 
         self._print("#", command, debug=True)
         self._print("#", command_str)
+
+        # todo: do we need all missing commits?
+        # We should look at only the most recent commits.
+        remote_commits = os.path.join(full_destpath, ".ys", "commits" + '/')
+        if self._args.command_name  == "push":
+            missing_commits = self._test_missing_commits(remote_commits,
+                                                         self.COMMITDIR + '/')
+        else:
+            missing_commits = self._test_missing_commits(self.COMMITDIR + '/',
+                                                         remote_commits)
+        if missing_commits:
+            raise OSError("destination has commits missing on source: {}"\
+                          .format(", ".join(missing_commits)) +
+                          ", synchronize these commits first"
+                         )
+
         completed_process = subprocess.Popen(
             command,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE
@@ -942,7 +943,8 @@ class YARsync():
         command += command_end
         command_str += " " + " ".join(command_end)
 
-        self._print(command_str)
+        if verbose:
+            print(command_str)
 
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
         # changed means there were actual changes in the working dir
@@ -955,7 +957,9 @@ class YARsync():
         for line in lines:
             if line:
                 print("Changed since last commit:")
-                if not line.startswith(b'.d..t......'):
+                # skip permissions
+                if not line.startswith(b'.'):
+                # if not line.startswith(b'.d..t......'):
                     changed = True
 
                 # print the line and all following lines.
