@@ -261,7 +261,7 @@ class YARsync():
             if not args.root_dir or not self.config_dir:
                 parser.error("both --config-dir and --root-dir must be provided")
         else:
-            if args.command_name == "init":
+            if args.command_name in ['init', 'status']:
                 self.config_dir, self.root_dir = CONFIGDIRNAME, "."
             else:
                 # search the current directory and its parents
@@ -294,7 +294,7 @@ class YARsync():
 
         self.DEBUG = True
 
-        if args.command_name not in ["init"]:
+        if args.command_name not in ['init', 'status']:
             # may be a subtle bug: here we check for CONFIGFILE,
             # but assume that config_dir exists.
             if not os.path.exists(self.CONFIGFILE):
@@ -883,16 +883,23 @@ class YARsync():
 
         If no yarsync configuration is found, an error is printed
         and 7 returned.
+
+        Return exit code of `rsync`.
+        If *check_changed* is `True`,
+        return a tuple *(returncode, changed)*,
+        where *changed* is `True`
+        if the working directory has changes since last commit.
         """
-        # Should status give an error
-        # if the directory is changed?
-        # Git, however, returns 0 for a changed directory.
+        # We don't return an error if the directory has changed,
+        # because it is a normal situation (not an error).
+        # This is the same as in git.
 
         if os.path.exists(self.COMMITDIR):
             commit_subdirs = [fil for fil in os.listdir(self.COMMITDIR)
                               if _is_commit(fil)]
         else:
             commit_subdirs = []
+
         ## no commits is fine for an initial commit
         if not commit_subdirs:
             self._print("No commits found")
@@ -934,7 +941,7 @@ class YARsync():
         for line in iter(sp.stdout.readline, b''):
             if line:
                 changed = True
-            # todo: use terminal encoding.
+            # todo: use terminal encoding
             print(line.decode("utf-8"), end='')
         returncode = sp.returncode
 
@@ -949,8 +956,8 @@ class YARsync():
                 self._print("\n# commits are up to date with {}"\
                             .format(repo))
             else:
-                n_newer_commits = sum([1 for cm in commits
-                                       if cm > synced_commit])
+                n_newer_commits = sum([1 for comm in commits
+                                       if comm > synced_commit])
                 self._print("# current repository is {} commits ahead of {}"\
                             .format(n_newer_commits, repo))
 
