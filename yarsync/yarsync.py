@@ -735,7 +735,7 @@ class YARsync():
         # If a file is new, it won't be in remote commits.
         # -H preserves hard links in one set of files (but see the note in todo.txt)
 
-        _, changed = self._status(check_changed=True)
+        _, changed = self._status(check_changed=True, verbose=False)
         if changed:
             raise OSError("local repository has uncommited changes")
 
@@ -877,7 +877,7 @@ class YARsync():
             for section in self._config.sections():
                 print(section)
 
-    def _status(self, check_changed=False):
+    def _status(self, check_changed=False, verbose=True):
         """Print files and directories that were updated more recently
         than last commit.
 
@@ -889,6 +889,9 @@ class YARsync():
         return a tuple *(returncode, changed)*,
         where *changed* is `True`
         if the working directory has changes since last commit.
+
+        If *verbose* is `False`,
+        output is printed only in case of changes.
         """
         # We don't return an error if the directory has changed,
         # because it is a normal situation (not an error).
@@ -902,7 +905,10 @@ class YARsync():
 
         ## no commits is fine for an initial commit
         if not commit_subdirs:
-            self._print("No commits found")
+            # if verbose:
+            print("No commits found")
+            if check_changed:
+                return (0, True)
             return 0
 
         newest_commit = max(map(int, commit_subdirs))
@@ -930,7 +936,6 @@ class YARsync():
         command_str += " " + " ".join(command_end)
 
         self._print(command_str)
-        self._print("# changed since last commit:\n")
 
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
         # changed means there were actual changes in the working dir
@@ -938,22 +943,37 @@ class YARsync():
         # note that directories may appear to be changed
         # just because of timestamps (add and remove a file), e.g.
         # b'.d..t...... ./\n'
-        for line in iter(sp.stdout.readline, b''):
+        # b'' means EOF in the iteration.
+        lines = iter(sp.stdout.readline, b'')
+        for line in lines:
             if line:
-                changed = True
-            # todo: use terminal encoding
-            print(line.decode("utf-8"), end='')
+                print("Changed since last commit:")
+                if not line.startswith(b'.d..t......'):
+                    changed = True
+
+                # print the line and all following lines.
+                # todo: use terminal encoding
+                print(line.decode("utf-8"), end='')
+                # in fact, readline could be used twice.
+                for line in lines:
+                    if not line.startswith(b'.d..t......'):
+                        changed = True
+                    print(line.decode("utf-8"), end='')
+
         returncode = sp.returncode
+
+        if not changed:
+            self._print("Nothing to commit, working directory clean.")
 
         try:
             synced_commit, repo = self._get_last_sync()
         except EnvironmentError:
-            self._print("# no syncronization information found")
+            self._print("No syncronization information found.")
         else:
             commits = list(self._get_local_commits())
             last_commit = self._get_last_commit(commits)
             if synced_commit == last_commit:
-                self._print("\n# commits are up to date with {}"\
+                self._print("\nCommits are up to date with {}."\
                             .format(repo))
             else:
                 n_newer_commits = sum([1 for comm in commits
