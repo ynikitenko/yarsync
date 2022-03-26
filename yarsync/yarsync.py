@@ -299,7 +299,7 @@ class YARsync():
 
         self.DEBUG = True
 
-        if args.command_name not in ['init', 'status']:
+        if args.command_name not in ['init', 'status', 'log']:
             if not os.path.exists(self.CONFIGFILE):
                 self._print_error(
                     "fatal: no {} configuration {} found".
