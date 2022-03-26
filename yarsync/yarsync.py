@@ -49,6 +49,9 @@ def _substitute_env(content):
         """
         key = match.group(2)
         if key not in os.environ:
+            # variables should be set for values that are used,
+            # but not necessarily for all values.
+            # raise OSError("variable {} unset".format(key))
             # unset variables return unchanged (with $)
             return match.group(1)
             # raise Exception("Config env var '{key}' not set".format(key))
@@ -515,7 +518,10 @@ class YARsync():
         configdict = self._configdict
         if not remote:
             # todo: to avoid confusion, rename "host" here to "remote"
-            remote = configdict["default"]["host"]
+            try:
+                remote = configdict["default"]["host"]
+            except KeyError:
+                raise ValueError("no default host found in config")
             # todo: this is wrong!! This doesn't give the first section, helas.
             # see ~/programming config. Wrong section is chosen.
             # defaultsect = list(configdict.items())[0]
@@ -729,7 +735,6 @@ class YARsync():
         print("!", msg)
 
     def _pull_push(self):
-        # draft, unfinished
         # actually, this was how it is below. No link-dest during push.
         # In fact, it is not needed.
         # If a file is new, it won't be in remote commits.
@@ -747,7 +752,7 @@ class YARsync():
             # a local path. Though we can't be sure the host is called localhost.
             remote, destpath = None, remote
             host = ""
-            if destpath[-1] != os.sep:
+            if destpath and destpath[-1] != os.sep:
                 destpath += os.sep  # '/' for Linux
 
         # print("host, destpath, remote =", host, destpath, remote)
@@ -764,6 +769,8 @@ class YARsync():
         else:
             missing_commits = self._test_missing_commits(self.COMMITDIR + '/',
                                                          remote_commits)
+
+        # todo: do we need that? We should look at only the most recent commits.
         if missing_commits:
             raise OSError("destination has commits missing on source: {}"\
                           .format(", ".join(missing_commits)) +
@@ -990,10 +997,10 @@ class YARsync():
     def _test_missing_commits(self, from_path, to_path):
         """Return a list of commits (directories) present on *from_path*
         and missing on *to_path*."""
-        self._print("test missing:", debug=True)
+        # self._print("test missing:", debug=True)
         command = "rsync -nr --info=NAME --include=/ --exclude=/*/*".split() \
                   + [from_path, to_path]
-        self._print(" ".join(command), debug=True)
+        # self._print(" ".join(command), debug=True)
         completed_process = subprocess.Popen(
             command,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE
