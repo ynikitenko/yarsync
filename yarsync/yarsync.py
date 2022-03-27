@@ -982,14 +982,14 @@ class YARsync():
                 print(line.decode("utf-8"), end='')
                 # in fact, readline could be used twice.
                 for line in lines:
-                    if not line.startswith(b'.d..t......'):
+                    if not line.startswith(b'.'):
                         changed = True
                     print(line.decode("utf-8"), end='')
 
         returncode = sp.returncode
 
         if not changed:
-            self._print("Nothing to commit, working directory clean.")
+            print("Nothing to commit, working directory clean.")
 
         try:
             synced_commit, repo = self._get_last_sync()
