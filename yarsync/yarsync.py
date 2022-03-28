@@ -129,10 +129,19 @@ class YARsync():
 
         # commit #
         parser_commit = subparsers.add_parser("commit",
-                                            help="commit changes")
+                                              help="commit changes")
         parser_commit.add_argument("-m", "--message", default="",
                                    help="commit message")
         parser_commit.set_defaults(func=self._commit)
+
+        # diff #
+        parser_status = subparsers.add_parser(
+            "diff", help="print difference between two commits"
+        )
+        parser_status.add_argument("commit", help="commit name")
+        parser_status.add_argument("other_commit", nargs="?", default=None,
+                                   help="other commit name")
+        parser_status.set_defaults(func=self._diff)
 
         # init #
         parser_init = subparsers.add_parser("init",
@@ -190,7 +199,7 @@ class YARsync():
                                  help="destination name or path")
         parser_push.set_defaults(func=self._pull_push)
 
-        ## remote ##
+        # remote #
         parser_remote = subparsers.add_parser(
             "remote", help="manage remote repositories"
         )
@@ -224,7 +233,15 @@ class YARsync():
         for subparser in [remote_add, remote_rm]:
             subparser.set_defaults(func=self._remote)
 
-        # status
+        # show #
+        parser_status = subparsers.add_parser(
+            "show", help="print log message and actual changes for commit(s)"
+        )
+        parser_status.add_argument("commit", nargs="+",
+                                   help="commit name")
+        parser_status.set_defaults(func=self._show)
+
+        # status #
         parser_status = subparsers.add_parser(
             "status", help="print updates since last commit"
         )
@@ -299,7 +316,7 @@ class YARsync():
 
         self.DEBUG = True
 
-        if args.command_name not in ['init', 'status', 'log']:
+        if args.command_name not in ['diff', 'init', 'log', 'show', 'status']:
             if not os.path.exists(self.CONFIGFILE):
                 self._print_error(
                     "fatal: no {} configuration {} found".
@@ -451,7 +468,57 @@ class YARsync():
 
         return 0
 
+    def _diff(self, commit1=None, commit2=None, /, verbose=True):
+        # arguments are positional only
+        """Print the difference between *commit1* and *commit2*
+        (from the old to the new one).
+        """
+
+        if commit1 is None:
+            commit1 = int(self._args.commit)
+
+        if commit2 is None:
+            commit2 = self._args.other_commit
+            if commit2 is None:
+                commit2 = self._get_last_commit()
+            else:
+                commit2 = int(commit2)
+
+        comm1 = min(commit1, commit2)
+        comm2 = max(commit1, commit2)
+
+        comm1_dir = os.path.join(self.COMMITDIR, str(comm1))
+        comm2_dir = os.path.join(self.COMMITDIR, str(comm2))
+
+        if not os.path.exists(comm1_dir):
+            raise ValueError("commit {} does not exist".format(comm1))
+        if not os.path.exists(comm2_dir):
+            raise ValueError("commit {} does not exist".format(comm2))
+
+        command = [
+            "rsync", "-aun", "--delete", "-i", 
+        ]
+        # outbuf option added in Rsync 3.1.0 (28 Sep 2013)
+        # https://download.samba.org/pub/rsync/NEWS#ENHANCEMENTS-3.1.0
+        # from https://stackoverflow.com/a/35775429
+        command.append('--outbuf=L')
+
+        # what changes should be applied for comm1 to become comm2
+        # / is extremely important!
+        command += [comm2_dir + '/', comm1_dir]
+
+        if verbose:
+            print(*command)
+
+        # todo: what about stderr?
+        sp = subprocess.Popen(command, stdout=subprocess.PIPE)
+        for line in iter(sp.stdout.readline, b''):
+            print(line.decode("utf-8"), end='')
+
+        # returncode = sp.returncode
+
     def _get_last_commit(self, commits=None):
+        # todo: cache the last commit (or all commits)
         if commits is None:
             commits = self._get_local_commits()
         if not commits:
@@ -459,19 +526,23 @@ class YARsync():
         return max(commits)
 
     def _get_last_sync(self):
-        with open(self.SYNCFILENAME) as fil:
-            data = fil.readlines()[0].strip()  # remove trailing newline
-            commit, repo = data.split(sep=",", maxsplit=1)
+        try:
+            with open(self.SYNCFILENAME) as fil:
+                data = fil.readlines()[0].strip()  # remove trailing newline
+                commit, repo = data.split(sep=",", maxsplit=1)
+        except EnvironmentError:
+            self._print("No syncronization information found.")
+            return (None, None)
         return (int(commit), repo)
 
     def _get_local_commits(self):
-        # return integer representations of local commits
-        # Take care to materialize the list if using the results twice!
+        """Return local commits as an iterable of integers."""
         try:
             # listdir always returns a list (Python 2 and 3)
             commit_candidates = os.listdir(self.COMMITDIR)
         except EnvironmentError:
             # no commits exist
+            # todo: do we print about that here?
             commit_candidates = []
         return map(int, filter(_is_commit, commit_candidates))
 
@@ -604,21 +675,27 @@ class YARsync():
         return 0
 
     def _make_commit_list(self, commits=None, logs=None):
-        """Make a list of (commit, commit_log).
+        """Make a list of *(commit, commit_log)*
+        for all logs and commits.
 
-        Commits and logs are sorted lists of integers.
+        *commits* and *logs* are sorted lists of integers.
 
-        If a commit_log is missing for a given commit,
-        ``None`` is used."""
-        # commits and logs in the interface are
-        # just for testing purposes
+        If a log is missing for a given commit,
+        or a commit is missing for a log, the result contains ``None``.
+        """
+        # commits and logs in the interface
+        # are only for testing purposes
 
-        def get_sorted_logs_int(files):
-            stripped_files = (fil[:-4] for fil in files)
-            return sorted(map(int, filter(_is_commit, stripped_files)))
-
-        if commits is None:
-            commits = sorted(self._get_local_commits())
+        def get_sorted_logs_int(files, commits=None):
+            # discard '.log' extension
+            log_names = (fil[:-4] for fil in files)
+            sorted_logs = sorted(map(int, filter(_is_commit, log_names)))
+            if commits is None:
+                return sorted_logs
+            else:
+                # if commits are set explicitly,
+                # return logs only for those commits
+                return [log for log in sorted_logs if log in commits]
 
         if logs is None:
             try:
@@ -626,7 +703,23 @@ class YARsync():
             except OSError:
                 # no log directory exists
                 log_files = []
-            logs = get_sorted_logs_int(log_files)
+            logs = get_sorted_logs_int(log_files, commits)
+
+        local_commits = sorted(self._get_local_commits())
+        if commits is None:
+            commits = local_commits
+        else:
+            # check that all commits exist
+            for commit in commits:
+                if commit not in local_commits:
+                    raise ValueError(
+                        "no commit {} found".format(commit)
+                    )
+            # todo: allow commits in the defined order.
+            # that would require first yielding all commits,
+            # then all logs without commits. Looks good.
+            # And much simpler. But will that be a good log?..
+            commits = sorted(commits)
 
         if not commits and not logs:
             return []
@@ -693,39 +786,13 @@ class YARsync():
             # otherwise the last element is excluded
             commit_log_list = commit_log_list[:max_count]
 
-        try:
-            synced_commit, remote = self._get_last_sync()
-        except EnvironmentError:
-            self._print("# no syncronization information found")
-            synced_commit, remote = (None, None)
+        synced_commit, remote = self._get_last_sync()
 
         def print_logs(commit_log_list):
             for ind, (commit, log) in enumerate(commit_log_list):
                 if ind:
                     self._print()
-                if commit is None:
-                    commit_str = "commit {} is missing".format(log)
-                    commit = log
-                else:
-                    if commit == synced_commit:
-                        sync_str = "<-> {}".format(remote)
-                        commit_str = "commit {} {}".format(commit, sync_str)
-                    else:
-                        commit_str = "commit " + str(commit)
-                if log is None:
-                    log_str = "Log is missing"
-                    # time.time is timezone independent.
-                    # Therefore localtime is the local time
-                    # corresponding to that universal time.
-                    # Commit could be made in any time zone.
-                    commit_time_str = time.strftime(self.DATEFMT, time.localtime(commit))
-                    log_str += "\nWhen: {}".format(commit_time_str) + '\n'
-                else:
-                    log_file = open(os.path.join(self.LOGDIR, str(log) + ".txt"))
-                    # read returns a redundant newline
-                    log_str = log_file.read()
-                    # print("log_str: '{}'".format(log_str))
-                self._print(commit_str, log_str, sep='\n', end='')
+                self._print_log(commit, log, synced_commit, remote)
 
         print_logs(commit_log_list)
 
@@ -744,6 +811,31 @@ class YARsync():
 
     def _print_error(self, msg):
         print("!", msg)
+
+    def _print_log(self, commit, log, synced_commit=None, remote=None):
+        if commit is None:
+            commit_str = "commit {} is missing".format(log)
+            commit = log
+        else:
+            if commit == synced_commit:
+                sync_str = "<-> {}".format(remote)
+                commit_str = "commit {} {}".format(commit, sync_str)
+            else:
+                commit_str = "commit " + str(commit)
+        if log is None:
+            log_str = "Log is missing"
+            # time.time is timezone independent.
+            # Therefore localtime is the local time
+            # corresponding to that universal time.
+            # Commit could be made in any time zone.
+            commit_time_str = time.strftime(self.DATEFMT, time.localtime(commit))
+            log_str += "\nWhen: {}".format(commit_time_str) + '\n'
+        else:
+            log_file = open(os.path.join(self.LOGDIR, str(log) + ".txt"))
+            # read returns a redundant newline
+            log_str = log_file.read()
+            # print("log_str: '{}'".format(log_str))
+        self._print(commit_str, log_str, sep='\n', end='')
 
     def _pull_push(self):
         # actually, this was how it is below. No link-dest during push.
@@ -900,6 +992,29 @@ class YARsync():
             for section in self._config.sections():
                 print(section)
 
+    def _show(self, commits=None):
+        # commits argument is for testing
+        if commits is None:
+            commits = [int(commit) for commit in self._args.commit]
+
+        commits_with_logs = self._make_commit_list(commits=commits)
+        synced_commit, remote = self._get_last_sync()
+        all_commits = sorted(self._get_local_commits())
+
+        for ind, cl in enumerate(commits_with_logs):
+            commit, log = cl
+            # print log
+            if ind:
+                print()
+            self._print_log(commit, log, synced_commit, remote)
+            # print commit
+            commit_ind = all_commits.index(commit)
+            if not commit_ind:
+                print("commit {} is initial commit".format(commit))
+                continue
+            previous_commit = all_commits[commit_ind - 1]
+            self._diff(commit, previous_commit)
+
     def _status(self, check_changed=False, verbose=True):
         """Print files and directories that were updated more recently
         than last commit.
@@ -991,11 +1106,9 @@ class YARsync():
         if not changed:
             print("Nothing to commit, working directory clean.")
 
-        try:
-            synced_commit, repo = self._get_last_sync()
-        except EnvironmentError:
-            self._print("No syncronization information found.")
-        else:
+        synced_commit, repo = self._get_last_sync()
+
+        if synced_commit is not None and repo is not None:
             commits = list(self._get_local_commits())
             last_commit = self._get_last_commit(commits)
             if synced_commit == last_commit:
