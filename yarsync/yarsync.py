@@ -127,6 +127,19 @@ class YARsync():
         ############################
         # or sub-commands
 
+        # checkout #
+        parser_checkout = subparsers.add_parser(
+            "checkout", help="print difference between two commits"
+        )
+        parser_checkout.add_argument(
+            "-n", "--dry-run", action="store_true",
+            default=False,
+            help="print what will be transferred during a real checkout, "
+                 "but don't make any changes"
+        )
+        parser_checkout.add_argument("commit", help="commit name")
+        parser_checkout.set_defaults(func=self._checkout)
+
         # commit #
         parser_commit = subparsers.add_parser("commit",
                                               help="commit changes")
@@ -303,6 +316,7 @@ class YARsync():
 
         # CONFIG = "config.ini"
         self.CONFIGFILE = os.path.join(self.config_dir, "config.ini")
+        self.HEADFILE = os.path.join(self.config_dir, "HEAD.txt")
         self.COMMITDIR = os.path.join(self.config_dir, "commits")
         self.DATEFMT = "%a, %d %b %Y %H:%M:%S %Z"
         self.LOGDIR = os.path.join(self.config_dir, "logs")
@@ -316,7 +330,9 @@ class YARsync():
 
         self.DEBUG = True
 
-        if args.command_name not in ['diff', 'init', 'log', 'show', 'status']:
+        if args.command_name in ['commit', 'pull', 'push', 'remote']:
+        # if args.command_name not in ['checkout', 'diff', 'init', 'log', 'show',
+        #                              'status']:
             if not os.path.exists(self.CONFIGFILE):
                 self._print_error(
                     "fatal: no {} configuration {} found".
@@ -371,8 +387,65 @@ class YARsync():
         with open(self.CONFIGFILE, "a") as configfile:
             config.write(configfile)
 
+    def _checkout(self):
+        """Checkout a commit.
+
+        Warning: all changes in the working directory will be overwritten!
+        """
+        # todo: do we allow a default (most recent) commit?
+        # also think about ^, ^^, etc.
+        # However, see no real usage for them.
+        commit = int(self._args.commit)
+        verbose = True
+
+        if commit not in self._get_local_commits():
+            raise ValueError("commit {} not found".format(commit))
+
+        # copied from _status()
+        commit_dir = os.path.join(self.COMMITDIR, str(commit))
+
+        command_begin = ["rsync", "-au"]
+        if self._args.dry_run:
+            command_begin += ["-n"]
+        command_begin.extend(["--delete", "-i", "--exclude=/.ys"])
+        command_str = " ".join(command_begin)
+
+        filter_command, filter_str = self._get_filter(include_commits=False)
+        command = command_begin + filter_command
+        if filter_str:
+            command_str += " " + filter_str
+
+        # outbuf option added in Rsync 3.1.0 (28 Sep 2013)
+        # https://download.samba.org/pub/rsync/NEWS#ENHANCEMENTS-3.1.0
+        # from https://stackoverflow.com/a/35775429
+        command.append('--outbuf=L')
+        command_str += " --outbuf=L"
+
+        command_end = [commit_dir + '/', self.root_dir]
+        command += command_end
+        command_str += " " + " ".join(command_end)
+
+        if verbose:
+            print(command_str)
+
+        sp = subprocess.Popen(command, stdout=subprocess.PIPE)
+
+        # todo: stderr?
+        for line in iter(sp.stdout.readline, b''):
+            print(line.decode("utf-8"), end='')
+
+        returncode = sp.returncode
+
+        if commit == self._get_last_commit():
+            # remove HEADFILE
+            self._update_head()
+        else:
+            # write HEADFILE
+            with open(self.HEADFILE, "w") as head_file:
+                print(commit, file=head_file)
+
     def _commit(self):
-        """Commit the working directory and log that."""
+        """Commit the working directory and create a log for that."""
         # commit directory name is based on UNIX time
         # date = datetime.date.today()
         # date_str = "{}{:#02}{:#02}".format(date.year, date.month, date.day)
@@ -401,7 +474,7 @@ class YARsync():
 
         # Raise if this commit exists
         # We don't want rsync to write twice to one commit
-        # even if it's hard to imagine how this could be possible
+        # even though it's hard to imagine how this could be possible
         # (probably broken clock?)
         if os.path.exists(commit_dir):
             raise RuntimeError("commit {} exists".format(commit_dir))
@@ -466,6 +539,9 @@ class YARsync():
             sep=""
         )
 
+        # if we were not at HEAD, move that now.
+        self._update_head()
+
         return 0
 
     def _diff(self, commit1=None, commit2=None, /, verbose=True):
@@ -517,8 +593,19 @@ class YARsync():
 
         # returncode = sp.returncode
 
+    def _get_head_commit(self):
+        try:
+            with open(self.HEADFILE, "r") as head:
+                # strip trailing newline
+                head_commit = head.readlines()[0].strip()
+        except OSError:
+            # no HEADFILE means HEAD is the most recent commit
+            return None
+        return int(head_commit)
+
     def _get_last_commit(self, commits=None):
         # todo: cache the last commit (or all commits)
+        # but: pull can update that!
         if commits is None:
             commits = self._get_local_commits()
         if not commits:
@@ -787,12 +874,13 @@ class YARsync():
             commit_log_list = commit_log_list[:max_count]
 
         synced_commit, remote = self._get_last_sync()
+        head_commit = self._get_head_commit()
 
         def print_logs(commit_log_list):
             for ind, (commit, log) in enumerate(commit_log_list):
                 if ind:
-                    self._print()
-                self._print_log(commit, log, synced_commit, remote)
+                    print()
+                self._print_log(commit, log, synced_commit, remote, head_commit)
 
         print_logs(commit_log_list)
 
@@ -812,16 +900,16 @@ class YARsync():
     def _print_error(self, msg):
         print("!", msg)
 
-    def _print_log(self, commit, log, synced_commit=None, remote=None):
+    def _print_log(self, commit, log, synced_commit=None, remote=None, head_commit=None):
         if commit is None:
             commit_str = "commit {} is missing".format(log)
             commit = log
         else:
+            commit_str = "commit " + str(commit)
+            if commit == head_commit:
+                commit_str += " (HEAD)"
             if commit == synced_commit:
-                sync_str = "<-> {}".format(remote)
-                commit_str = "commit {} {}".format(commit, sync_str)
-            else:
-                commit_str = "commit " + str(commit)
+                commit_str += " <-> {}".format(remote)
         if log is None:
             log_str = "Log is missing"
             # time.time is timezone independent.
@@ -842,6 +930,12 @@ class YARsync():
         # In fact, it is not needed.
         # If a file is new, it won't be in remote commits.
         # -H preserves hard links in one set of files (but see the note in todo.txt)
+
+        # it is safe to push a repo with detached HEAD,
+        # but that would be messy
+        if self._get_head_commit() is not None:
+            # why OSError?..
+            raise OSError("local repository has detached HEAD, aborting...")
 
         returncode, changed = self._status(check_changed=True, verbose=False)
         if changed:
@@ -913,9 +1007,14 @@ class YARsync():
         stdoutdata, stderrdata = completed_process.communicate()
         returncode = completed_process.returncode
         if returncode:
-            self._print_error("an error occurred, rsync returned {}".format(returncode))
+            # todo: error message?
+            self._print_error(
+                "an error occurred, rsync returned {}".format(returncode)
+            )
             return returncode
 
+        # todo: store information about
+        # synchronization with several remotes
         last_commit = self._get_last_commit()
         if last_commit is not None:
             sync_str = "{},{}".format(last_commit, remote)
@@ -925,6 +1024,10 @@ class YARsync():
             except OSError:
                 self._print_error("data transferred, but could not log to {}"
                                   .format(self.SYNCFILENAME))
+
+        # either HEAD was correct ("not detached") (for push)
+        # or it was updated (by pull)
+        self._update_head()
 
         return 0
 
@@ -1049,8 +1152,13 @@ class YARsync():
                 return (0, True)
             return 0
 
-        newest_commit = max(map(int, commit_subdirs))
-        newest_commit_dir = os.path.join(self.COMMITDIR, str(newest_commit))
+        head_commit = self._get_head_commit()
+        if head_commit is None:
+            newest_commit = max(map(int, commit_subdirs))
+            ref_commit_dir = os.path.join(self.COMMITDIR, str(newest_commit))
+        else:
+            ref_commit_dir = os.path.join(self.COMMITDIR, str(head_commit))
+
         filter_command, filter_str = self._get_filter(include_commits=False)
 
         command_begin = [
@@ -1069,7 +1177,7 @@ class YARsync():
         command_str += " --outbuf=L"
 
         root_path = self.root_dir + "/"
-        command_end = [root_path, newest_commit_dir]
+        command_end = [root_path, ref_commit_dir]
         command += command_end
         command_str += " " + " ".join(command_end)
 
@@ -1086,7 +1194,7 @@ class YARsync():
         lines = iter(sp.stdout.readline, b'')
         for line in lines:
             if line:
-                print("Changed since last commit:")
+                print("Changed since head commit:")
                 # skip permissions
                 if not line.startswith(b'.'):
                 # if not line.startswith(b'.d..t......'):
@@ -1102,6 +1210,10 @@ class YARsync():
                     print(line.decode("utf-8"), end='')
 
         returncode = sp.returncode
+
+        if head_commit is not None:
+            print("\nDetached HEAD (see '{} log' for more recent commits)"
+                  .format(self.NAME))
 
         if not changed:
             print("Nothing to commit, working directory clean.")
@@ -1129,7 +1241,11 @@ class YARsync():
     def _test_missing_commits(self, from_path, to_path):
         """Return a list of commits (directories) present on *from_path*
         and missing on *to_path*."""
-        # self._print("test missing:", debug=True)
+        # "-r" means recursive
+        # "-r --exclude='/*/*'" means
+        # to list a single directory without recursion.
+        # If a pattern ends with a '/',
+        # then it will only match a directory
         command = "rsync -nr --info=NAME --include=/ --exclude=/*/*".split() \
                   + [from_path, to_path]
         # self._print(" ".join(command), debug=True)
@@ -1145,6 +1261,13 @@ class YARsync():
         dirs = (os.path.dirname(str(dir_, 'utf-8')) for dir_ in raw_names)
         missing_commits = [os.path.basename(dir_) for dir_ in dirs if dir_]
         return missing_commits
+
+    def _update_head(self):
+        try:
+            # no HEADFILE means HEAD is the most recent commit
+            os.remove(self.HEADFILE)
+        except FileNotFoundError:
+            pass
 
     def __call__(self):
         """Call the command set during the initialization.
