@@ -182,7 +182,7 @@ class YARsync():
         )
         parser_pull.add_argument(
             "--new", action="store_true",
-            help="don't remove files missing on the source here"
+            help="don't remove files here that are missing on source"
         )
         parser_pull.add_argument("source", nargs="?",
                                  help="source name or path")
@@ -204,10 +204,13 @@ class YARsync():
             help="print what would be transferred during a real run, "
                  "but don't make any change"
         )
-        parser_push.add_argument(
-            "--new", action="store_true",
-            help="don't remove files missing here on the destination"
-        )
+        # we don't allow pushing new files to remote,
+        # because that would cause its unconsistent state
+        # (while locally we merge new files manually)
+        # parser_push.add_argument(
+        #     "--new", action="store_true",
+        #     help="don't remove files missing here on the destination"
+        # )
         parser_push.add_argument("destination", nargs="?",
                                  help="destination name or path")
         parser_push.set_defaults(func=self._pull_push)
@@ -320,6 +323,7 @@ class YARsync():
         self.COMMITDIR = os.path.join(self.config_dir, "commits")
         self.DATEFMT = "%a, %d %b %Y %H:%M:%S %Z"
         self.LOGDIR = os.path.join(self.config_dir, "logs")
+        self.MERGEFILENAME = os.path.join(self.config_dir, "MERGE.txt")
         # REMOTESDIR = os.path.join(self.config_dir, "remotes")
         self.RSYNCFILTER = os.path.join(self.config_dir, "rsync-filter")
         # this could be a useful configuration, for example
@@ -330,7 +334,7 @@ class YARsync():
 
         self.DEBUG = True
 
-        if args.command_name in ['commit', 'pull', 'push', 'remote']:
+        if args.command_name in ['pull', 'push', 'remote']:
         # if args.command_name not in ['checkout', 'diff', 'init', 'log', 'show',
         #                              'status']:
             if not os.path.exists(self.CONFIGFILE):
@@ -387,7 +391,7 @@ class YARsync():
         with open(self.CONFIGFILE, "a") as configfile:
             config.write(configfile)
 
-    def _checkout(self):
+    def _checkout(self, commit=None):
         """Checkout a commit.
 
         Warning: all changes in the working directory will be overwritten!
@@ -395,7 +399,8 @@ class YARsync():
         # todo: do we allow a default (most recent) commit?
         # also think about ^, ^^, etc.
         # However, see no real usage for them.
-        commit = int(self._args.commit)
+        if commit is None:
+            commit = int(self._args.commit)
         verbose = True
 
         if commit not in self._get_local_commits():
@@ -445,7 +450,7 @@ class YARsync():
                 print(commit, file=head_file)
 
     def _commit(self):
-        """Commit the working directory and create a log for that."""
+        """Commit the working directory and create a log."""
         # commit directory name is based on UNIX time
         # date = datetime.date.today()
         # date_str = "{}{:#02}{:#02}".format(date.year, date.month, date.day)
@@ -463,6 +468,15 @@ class YARsync():
         )
         if short_commit_mess:
             short_commit_mess += "\n\n"
+
+        if os.path.exists(self.MERGEFILENAME):
+            # copied from _status
+            with open(self.MERGEFILENAME, "r") as fil:
+                merge_str = fil.readlines()[0].strip()
+            merges = merge_str.split(',')
+            short_commit_mess += "Merge {} and {} (common commit {})\n"\
+                                 .format(*merges)
+
         short_commit_mess += log_str
 
         if not os.path.exists(self.COMMITDIR):
@@ -539,7 +553,13 @@ class YARsync():
             sep=""
         )
 
-        # if we were not at HEAD, move that now.
+        try:
+            # merge is done, if it was active
+            os.remove(self.MERGEFILENAME)
+        except FileNotFoundError:
+            pass
+
+        # if we were not at HEAD, move that now
         self._update_head()
 
         return 0
@@ -617,7 +637,7 @@ class YARsync():
             with open(self.SYNCFILENAME) as fil:
                 data = fil.readlines()[0].strip()  # remove trailing newline
                 commit, repo = data.split(sep=",", maxsplit=1)
-        except EnvironmentError:
+        except OSError:
             self._print("No syncronization information found.")
             return (None, None)
         return (int(commit), repo)
@@ -627,7 +647,7 @@ class YARsync():
         try:
             # listdir always returns a list (Python 2 and 3)
             commit_candidates = os.listdir(self.COMMITDIR)
-        except EnvironmentError:
+        except OSError:
             # no commits exist
             # todo: do we print about that here?
             commit_candidates = []
@@ -701,6 +721,32 @@ class YARsync():
         if not destpath.endswith('/'):
             destpath += '/'
         return (host, destpath)
+
+    def _get_remote_commits(self, commit_dir):
+        """Return remote commits as a list of integers."""
+        command = ["rsync", "--list-only", commit_dir]
+
+        print(" ".join(command))
+        sp = subprocess.Popen(command, stdout=subprocess.PIPE)
+
+        returncode = sp.returncode
+        if returncode:
+            raise OSError(
+                "error during listing of remote commits: rsync returned {}"\
+                .format(returncode)
+            )
+
+        commits = []
+        for line in iter(sp.stdout.readline, b''):
+            comm = line.split()[-1]
+            if comm not in [b'.', b'..']:
+                if not _is_commit(comm):
+                    raise OSError(
+                        "not a commit found on remote: {}".format(comm)
+                    )
+                commits.append(int(comm))
+
+        return commits
 
     def _get_root_directory(self, sync_dir):
         cur_path = os.getcwd()
@@ -926,23 +972,38 @@ class YARsync():
         self._print(commit_str, log_str, sep='\n', end='')
 
     def _pull_push(self):
-        # actually, this was how it is below. No link-dest during push.
-        # In fact, it is not needed.
-        # If a file is new, it won't be in remote commits.
-        # -H preserves hard links in one set of files (but see the note in todo.txt)
+        """Push/pull commits to/from destination or source.
 
-        # it is safe to push a repo with detached HEAD,
-        # but that would be messy
+        Several checks are made to prevent corruption:
+            - source has no uncommitted changes,
+            - source has not a detached HEAD,
+            - source is not in a merging state,
+            - destination has no commits missing on source.
+
+        Note that the destination might have uncommitted changes:
+        check that with *-n* (*--dry-run*) first!
+        """
+
         if self._get_head_commit() is not None:
-            # why OSError?..
-            raise OSError("local repository has detached HEAD, aborting...")
+            # it could be safe to push a repo with a detached HEAD,
+            # but that would be messy.
+            # OSError is for exceptions
+            # that can occur outside the Python system
+            raise OSError("local repository has detached HEAD.\n"
+                          "*checkout* the most recent commit first.")
+        if os.path.exists(self.MERGEFILENAME):
+            raise OSError(
+                "local repository has unmerged changes.\n"
+                "Manually update the working directory and *commit*."
+            )
 
         returncode, changed = self._status(check_changed=True, verbose=False)
         if changed:
-            raise OSError("local repository has uncommited changes")
+            raise OSError("local repository has uncommitted changes")
         if returncode:
-            raise OSError("could not check for uncommited changes, "
-                          "rsync returned {}".format(returncode))
+            raise OSError("could not check for uncommitted changes, "
+                          "rsync returned {}\n".format(returncode) +
+                          "run *status* manually to check the error")
 
         remote = self._args._remote
 
@@ -950,34 +1011,40 @@ class YARsync():
             host, destpath = self._get_dest_path(remote)
         except KeyError as err:
             raise err from None
-            # # a local path. Though we can't be sure the host is called localhost.
-            # remote, destpath = None, remote
-            # host = ""
-            # if destpath and destpath[-1] != os.sep:
-            #     destpath += os.sep  # '/' for Linux
         full_destpath = _mkhostpath(host, destpath)
 
-        # print("host, destpath, remote =", host, destpath, remote)
-        new = self._args.new
-        # if there exists .ys/rsync-filter, command will need quotes,
-        # but they are present there
-        filter_, filter_str = self._get_filter()
-
+        # --link-dest is not needed, since if a file is new,
+        # it won't be in remote commits.
+        # -H preserves hard links in one set of files (but see the note in todo.txt)
         command = ["rsync", "-avHP"]
-        if self._args.dry_run:
+
+        dry_run = self._args.dry_run
+        if dry_run:
             command += ["-n"]
         command_str = " ".join(command)
+
+        # --new can only be called with pull
+        if self._args.command_name == "pull":
+            new = self._args.new
+        else:
+            new = False
+
         if not new:
             command.append("--delete-after")
             command_str += " --delete-after"
+
+        # if there exists .ys/rsync-filter, command string needs quotes
+        filter_, filter_str = self._get_filter()
         command.extend(filter_)
         command_str += " " + filter_str
+
         root_path = self.root_dir + "/"
         if self._args.command_name == "push":
             command.append(root_path)
             command.append(full_destpath)
             command_str += " {} {}".format(root_path, full_destpath)
-        else:  # pull
+        else:
+            # pull
             command.append(full_destpath)
             command.append(root_path)
             command_str += " {} {}".format(full_destpath, root_path)
@@ -985,20 +1052,35 @@ class YARsync():
         # self._print("#", command, debug=True)
         self._print("#", command_str)
 
+        # old local commits (before possible pull)
+        local_commits = list(self._get_local_commits())
+
+        # if there are no remote commits (a new repository),
+        # push will still work
+        remote_commits_dir = os.path.join(full_destpath, ".ys", "commits" + '/')
+        remote_commits = self._get_remote_commits(remote_commits_dir)
+
         # todo: do we need all missing commits?
         # We should look at only the most recent commits.
-        remote_commits = os.path.join(full_destpath, ".ys", "commits" + '/')
-        if self._args.command_name  == "push":
-            missing_commits = self._test_missing_commits(remote_commits,
+        if self._args.command_name == "push":
+            missing_commits = self._test_missing_commits(remote_commits_dir,
                                                          self.COMMITDIR + '/')
         else:
             missing_commits = self._test_missing_commits(self.COMMITDIR + '/',
-                                                         remote_commits)
-        if missing_commits:
-            raise OSError("destination has commits missing on source: {}"\
-                          .format(", ".join(missing_commits)) +
-                          ", synchronize these commits first"
-                         )
+                                                         remote_commits_dir)
+
+        if not new and missing_commits:
+            missing_commits_str = ", ".join(map(str, missing_commits))
+            raise OSError(
+                "\ndestination has commits missing on source: {}, "\
+                .format(missing_commits_str) +
+                "synchronize these commits first:\n"
+                "1) pull missing commits with 'pull --new',\n"
+                "2) push if these commits were successfully merged, or\n"
+                "2') optionally checkout,\n"
+                "3') manually update the working directory "
+                "to the desired state, commit and push."
+            )
 
         completed_process = subprocess.Popen(
             command,
@@ -1013,10 +1095,44 @@ class YARsync():
             )
             return returncode
 
-        # todo: store information about
-        # synchronization with several remotes
-        last_commit = self._get_last_commit()
-        if last_commit is not None:
+        if new:
+            last_remote_comm = max(remote_commits)
+            if last_remote_comm in local_commits:
+                # remote commits are within locals (except some old ones)
+                # update the working directory
+                self._checkout(max(local_commits))
+                print("remote commits automatically merged")
+            else:
+                # remote commits diverged, need to merge them manually
+                common_commits = set(local_commits)\
+                                 .intersection(remote_commits)
+                if common_commits:
+                    common_comm = max(common_commits)
+                else:
+                    common_comm = "missing"
+                merge_str = "{},{},{}".format(max(local_commits),
+                                              last_remote_comm, common_comm)
+                try:
+                    with open(self.MERGEFILENAME, "w") as fil:
+                        print(merge_str, end="", file=fil)
+                except OSError:
+                    self._print_error(
+                        "could not create a merge file {}, "\
+                        .format(self.MERGEFILENAME) +
+                        "create that manually with " + merge_str
+                    )
+                    raise OSError from None
+                print("merge {} and {} manually and commit "
+                      "(most recent common commit is {})".\
+                      format(max(local_commits), last_remote_comm, common_comm))
+
+        if not new and not dry_run:
+            # *new* means we've not fully synchronized yet
+            last_commit = self._get_last_commit()
+            # is it not possible that we have no commits at all,
+            # because that would mean uncommitted changes.
+            # todo: store information about
+            # synchronization with several remotes?
             sync_str = "{},{}".format(last_commit, remote)
             try:
                 with open(self.SYNCFILENAME, "w") as fil:
@@ -1025,9 +1141,9 @@ class YARsync():
                 self._print_error("data transferred, but could not log to {}"
                                   .format(self.SYNCFILENAME))
 
-        # either HEAD was correct ("not detached") (for push)
-        # or it was updated (by pull)
-        self._update_head()
+            # either HEAD was correct ("not detached") (for push)
+            # or it was updated (by pull)
+            self._update_head()
 
         return 0
 
@@ -1096,6 +1212,11 @@ class YARsync():
                 print(section)
 
     def _show(self, commits=None):
+        """Show commit(s).
+
+        Print log and difference with the previous commit
+        for each commit.
+        """
         # commits argument is for testing
         if commits is None:
             commits = [int(commit) for commit in self._args.commit]
@@ -1215,6 +1336,13 @@ class YARsync():
             print("\nDetached HEAD (see '{} log' for more recent commits)"
                   .format(self.NAME))
 
+        if os.path.exists(self.MERGEFILENAME):
+            with open(self.MERGEFILENAME, "r") as fil:
+                merge_str = fil.readlines()[0].strip()
+            merges = merge_str.split(',')
+            print("Merging {} and {} (most recent common commit {})."\
+                  .format(*merges))
+
         if not changed:
             print("Nothing to commit, working directory clean.")
 
@@ -1229,7 +1357,7 @@ class YARsync():
             else:
                 n_newer_commits = sum([1 for comm in commits
                                        if comm > synced_commit])
-                self._print("# current repository is {} commits ahead of {}"\
+                self._print("# local repository is {} commits ahead of {}"\
                             .format(n_newer_commits, repo))
 
         # called from an internal method
@@ -1240,7 +1368,8 @@ class YARsync():
 
     def _test_missing_commits(self, from_path, to_path):
         """Return a list of commits (directories) present on *from_path*
-        and missing on *to_path*."""
+        and missing on *to_path*.
+        """
         # "-r" means recursive
         # "-r --exclude='/*/*'" means
         # to list a single directory without recursion.
@@ -1259,7 +1388,7 @@ class YARsync():
         # commit folder can have files from the user
         # (maybe it should not be allowed: are they transferred at all?..)
         dirs = (os.path.dirname(str(dir_, 'utf-8')) for dir_ in raw_names)
-        missing_commits = [os.path.basename(dir_) for dir_ in dirs if dir_]
+        missing_commits = [int(os.path.basename(dir_)) for dir_ in dirs if dir_]
         return missing_commits
 
     def _update_head(self):
@@ -1281,7 +1410,7 @@ class YARsync():
             # and functions throw no exceptions
             returncode = self._func()
         # in Python 3 EnvironmentError is an alias to OSError
-        except EnvironmentError as err:
+        except OSError as err:
             # In Python 3 there are more errors, e.g. PermissionError, etc.
             # PermissionError belongs to OSError in Python 3,
             # but to IOError in Python 2.
