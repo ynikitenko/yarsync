@@ -199,6 +199,10 @@ class YARsync():
             "push", help="update data on the destination"
         )
         parser_push.add_argument(
+            "-f", "--force", action="store_true",
+            help="remove commits and logs missing on source"
+        )
+        parser_push.add_argument(
             "-n", "--dry-run", action="store_true",
             default=False,
             help="print what would be transferred during a real run, "
@@ -1024,9 +1028,13 @@ class YARsync():
         command_str = " ".join(command)
 
         # --new can only be called with pull
+        # --force can only be called with push,
+        #   because we check working tree and other local issues
         if self._args.command_name == "pull":
             new = self._args.new
+            force = False
         else:
+            force = self._args.force
             new = False
 
         if not new:
@@ -1057,19 +1065,22 @@ class YARsync():
 
         # if there are no remote commits (a new repository),
         # push will still work
-        remote_commits_dir = os.path.join(full_destpath, ".ys", "commits" + '/')
+        remote_commits_dir = os.path.join(full_destpath, ".ys", "commits/")
         remote_commits = self._get_remote_commits(remote_commits_dir)
 
-        # todo: do we need all missing commits?
-        # We should look at only the most recent commits.
-        if self._args.command_name == "push":
-            missing_commits = self._test_missing_commits(remote_commits_dir,
-                                                         self.COMMITDIR + '/')
-        else:
-            missing_commits = self._test_missing_commits(self.COMMITDIR + '/',
-                                                         remote_commits_dir)
+        if not force:
+            # todo: do we need all missing commits?
+            # We should look at only the most recent commits.
+            if self._args.command_name == "push":
+                missing_commits = self._test_missing_commits(
+                    remote_commits_dir, self.COMMITDIR + '/'
+                )
+            else:
+                missing_commits = self._test_missing_commits(
+                    self.COMMITDIR + '/', remote_commits_dir
+                )
 
-        if not new and missing_commits:
+        if not (force or new) and missing_commits:
             missing_commits_str = ", ".join(map(str, missing_commits))
             raise OSError(
                 "\ndestination has commits missing on source: {}, "\
@@ -1079,7 +1090,9 @@ class YARsync():
                 "2) push if these commits were successfully merged, or\n"
                 "2') optionally checkout,\n"
                 "3') manually update the working directory "
-                "to the desired state, commit and push."
+                "to the desired state, commit and push,\n"
+                "2'') --force local state to remote "
+                "(removing all commits and logs missing on the destination)."
             )
 
         completed_process = subprocess.Popen(
@@ -1127,7 +1140,7 @@ class YARsync():
                       format(max(local_commits), last_remote_comm, common_comm))
 
         if not new and not dry_run:
-            # *new* means we've not fully synchronized yet
+            # --new means we've not fully synchronized yet
             last_commit = self._get_last_commit()
             # is it not possible that we have no commits at all,
             # because that would mean uncommitted changes.
