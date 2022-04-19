@@ -2,7 +2,7 @@
 Yarsync
 =======
 
-Yarsync is a program to synchronize data (files and directories) between Unix-like systems.
+Yet Another Rsync is a program to synchronize data (files and directories) between Unix-like systems.
 
 It allows to use ``git`` command semantics while working with files. This can be helpful in two ways:
 
@@ -14,10 +14,8 @@ Examples:
 .. code-block:: console
 
     yarsync push <remote>
-    # push data to the remote
 
     yarsync pull <remote>
-    # pull data from the remote
 
 ``yarsync`` is a wrapper around ``rsync`` written in Python.
 
@@ -28,7 +26,7 @@ Installation
 ``yarsync`` is a Python script.
 Download the repository and add the directory with ``yarsync`` to your ``PATH``.
 
-Install Python dependencies:
+Install Python dependencies (only for developers):
 
 .. code-block:: console
 
@@ -125,8 +123,10 @@ Git-annex has a list of `git-related <https://git-annex.branchable.com/not/>`_ t
 ------------------
 Development status
 ------------------
-``yarsync`` works and is used by its author without errors, and has a good test coverage.
+``yarsync`` works and is used by its author without errors.
+It does its main tasks robustly on Linux,
+but at the moment it is not tested on different systems for diverse tasks.
 
-At the moment I'm going to add several special options. Documentation will be also improved before the first tagged release.
-
-Stay tuned!
+Any data synchronization may lead to data loss,
+so it is recommended to have several data copies
+and always try *--dry-run* (*-n*) first before the actual run.
