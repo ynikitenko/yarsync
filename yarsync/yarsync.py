@@ -129,7 +129,7 @@ class YARsync():
 
         # checkout #
         parser_checkout = subparsers.add_parser(
-            "checkout", help="print difference between two commits"
+            "checkout", help="check out a commit"
         )
         parser_checkout.add_argument(
             "-n", "--dry-run", action="store_true",
