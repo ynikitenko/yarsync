@@ -1125,16 +1125,18 @@ class YARsync():
                     common_comm = "missing"
                 merge_str = "{},{},{}".format(max(local_commits),
                                               last_remote_comm, common_comm)
-                try:
-                    with open(self.MERGEFILENAME, "w") as fil:
-                        print(merge_str, end="", file=fil)
-                except OSError:
-                    self._print_error(
-                        "could not create a merge file {}, "\
-                        .format(self.MERGEFILENAME) +
-                        "create that manually with " + merge_str
-                    )
-                    raise OSError from None
+                # todo: check that it is taken into account in other places!
+                if not dry_run:
+                    try:
+                        with open(self.MERGEFILENAME, "w") as fil:
+                            print(merge_str, end="", file=fil)
+                    except OSError:
+                        self._print_error(
+                            "could not create a merge file {}, "\
+                            .format(self.MERGEFILENAME) +
+                            "create that manually with " + merge_str
+                        )
+                        raise OSError from None
                 print("merge {} and {} manually and commit "
                       "(most recent common commit is {})".\
                       format(max(local_commits), last_remote_comm, common_comm))
