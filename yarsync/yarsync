@@ -12,13 +12,13 @@ if __name__ == "__main__":
         ys = YARsync(sys.argv)
     except (argparse.ArgumentError, argparse.ArgumentTypeError, SystemExit) \
            as err:
+        # the error is printed by argparse.
         # SystemExit can raise from argparse
-        # and it caused much misunderstanding, see e.g.
+        # and it has caused much misunderstanding, e.g.
         # https://stackoverflow.com/questions/42249982/systemexit-2-error-when-calling-parse-args
-        # the error itself is printed by argparse
         sys.exit(7)
-    except OSError:
-        # the error is printed by YARsync, if error output is allowed
+    except OSError as err:
+        # the error is printed by YARsync
         sys.exit(8)
 
     # make actual call

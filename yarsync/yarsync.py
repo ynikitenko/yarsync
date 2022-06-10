@@ -18,17 +18,22 @@ import sys
 import time
 
 
-# private, because I see no reason to document this
+######################
+## Helper functions ##
+######################
+
 def _is_commit(file_name):
-    """A file name is a commit
-    if its name can be converted to int.
-    """
+    """A *file_name* is a commit if it can be converted to int."""
     try:
         int(file_name)
     except (TypeError, ValueError):
         return False
     return True
 
+def _print_error(msg):
+    # not a class method, because it can be run
+    # when YARsync was not fully initialised yet
+    print("!", msg)
 
 # copied from https://github.com/DiffSK/configobj/issues/144#issuecomment-347019778
 # with some modifications.
@@ -303,6 +308,10 @@ class YARsync():
                     root_dir = self._get_root_directory(CONFIGDIRNAME)
                 except OSError as err:
                     # config dir not found.
+                    _print_error(
+                        "fatal: no {} configuration directory {} found".
+                        format(self.NAME, CONFIGDIRNAME)
+                    )
                     raise err
                 config_dir = os.path.join(root_dir, CONFIGDIRNAME)
         else:
@@ -342,7 +351,7 @@ class YARsync():
         # if args.command_name not in ['checkout', 'diff', 'init', 'log', 'show',
         #                              'status']:
             if not os.path.exists(self.CONFIGFILE):
-                self._print_error(
+                _print_error(
                     "fatal: no {} configuration {} found".
                     format(self.NAME, self.CONFIGFILE)
                 )
@@ -531,7 +540,7 @@ class YARsync():
         stdoutdata, stderrdata = completed_process.communicate()
         returncode = completed_process.returncode
         if returncode:
-            self._print_error("an error occurred during hard linking, "
+            _print_error("an error occurred during hard linking, "
                               "rsync returned {}".format(returncode))
             return returncode
 
@@ -947,9 +956,6 @@ class YARsync():
         # print(str(stdoutdata, 'utf-8'), end="")
         print(*args, **kwargs)
 
-    def _print_error(self, msg):
-        print("!", msg)
-
     def _print_log(self, commit, log, synced_commit=None, remote=None, head_commit=None):
         if commit is None:
             commit_str = "commit {} is missing".format(log)
@@ -1103,7 +1109,7 @@ class YARsync():
         returncode = completed_process.returncode
         if returncode:
             # todo: error message?
-            self._print_error(
+            _print_error(
                 "an error occurred, rsync returned {}".format(returncode)
             )
             return returncode
@@ -1131,7 +1137,7 @@ class YARsync():
                         with open(self.MERGEFILENAME, "w") as fil:
                             print(merge_str, end="", file=fil)
                     except OSError:
-                        self._print_error(
+                        _print_error(
                             "could not create a merge file {}, "\
                             .format(self.MERGEFILENAME) +
                             "create that manually with " + merge_str
@@ -1153,7 +1159,7 @@ class YARsync():
                 with open(self.SYNCFILENAME, "w") as fil:
                     print(sync_str, end="", file=fil)
             except OSError:
-                self._print_error("data transferred, but could not log to {}"
+                _print_error("data transferred, but could not log to {}"
                                   .format(self.SYNCFILENAME))
 
             # either HEAD was correct ("not detached") (for push)
@@ -1429,6 +1435,6 @@ class YARsync():
             # In Python 3 there are more errors, e.g. PermissionError, etc.
             # PermissionError belongs to OSError in Python 3,
             # but to IOError in Python 2.
-            self._print_error(err)
+            _print_error(err)
             returncode = 8
         return returncode
