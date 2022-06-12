@@ -37,14 +37,14 @@ def test_print(mocker):
 
     args = ["yarsync", "log"]
     ys = YARsync(args)  # command is not called
-    ys.DEBUG = True
+    # ys.print_level = 2
 
-    ys._print("debug", debug=True)
+    ys._print("debug", level=2)
     assert mocker_print.mock_calls == [
-        call.write('debug'), call.write('\n')
+        call.write('# '), call.write(''), call.write('debug'), call.write('\n')
     ]
 
-    ys.DEBUG = False
+    ys.print_level = 1
 
     mocker_print.reset_mock()
     # will print unconditionally
@@ -54,5 +54,5 @@ def test_print(mocker):
     ]
 
     mocker_print.reset_mock()
-    ys._print("debug unavailable", debug=True)
+    ys._print("debug unavailable", level=2)
     assert mocker_print.mock_calls == []

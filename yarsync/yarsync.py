@@ -691,6 +691,7 @@ class YARsync():
 
     def _get_local_commits(self):
         """Return local commits as an iterable of integers."""
+        # todo: cache results.
         try:
             # listdir always returns a list (Python 2 and 3)
             commit_candidates = os.listdir(self.COMMITDIR)
@@ -880,22 +881,23 @@ class YARsync():
                 # no log directory exists
                 log_files = []
             logs = get_sorted_logs_int(log_files, commits)
-
-        local_commits = sorted(self._get_local_commits())
+        
         if commits is None:
-            commits = local_commits
+            commits = sorted(self._get_local_commits())
         else:
-            # check that all commits exist
-            for commit in commits:
-                if commit not in local_commits:
-                    raise ValueError(
-                        "no commit {} found".format(commit)
-                    )
+            commits = sorted(commits)
+            # this check has nothing to do with the function logic.
+            # # check that all commits exist
+            # for commit in commits:
+            #     if commit not in local_commits:
+            #         raise ValueError(
+            #             "no commit {} found".format(commit)
+            #         )
+            #
             # todo: allow commits in the defined order.
             # that would require first yielding all commits,
             # then all logs without commits. Looks good.
             # And much simpler. But will that be a good log?..
-            commits = sorted(commits)
 
         if not commits and not logs:
             return []
@@ -994,7 +996,8 @@ class YARsync():
         # However, _print is used internally - to handle output levels.
         self._print(comm)
 
-    def _print_log(self, commit, log, synced_commit=None, remote=None, head_commit=None):
+    def _print_log(self, commit, log, synced_commit=None, remote=None,
+                   head_commit=None):
         if commit is None:
             commit_str = "commit {} is missing".format(log)
             commit = log
@@ -1017,8 +1020,9 @@ class YARsync():
             # read returns a redundant newline
             log_str = log_file.read()
             # print("log_str: '{}'".format(log_str))
-        print(commit_str, log_str, sep='\n', end='')
-        # self._print(commit_str, log_str, sep='\n', end='')
+        # hard to imagine a "quiet log", but still.
+        self._print(commit_str, log_str, sep='\n', end='')
+        # print(commit_str, log_str, sep='\n', end='')
 
     def _pull_push(self):
         """Push/pull commits to/from destination or source.
@@ -1283,9 +1287,16 @@ class YARsync():
         if commits is None:
             commits = [int(commit) for commit in self._args.commit]
 
+        all_commits = sorted(self._get_local_commits())
+        for commit in commits:
+            if commit not in all_commits:
+                raise ValueError(
+                    "no commit {} found".format(commit)
+                )
+
+        # commit logs can be None
         commits_with_logs = self._make_commit_list(commits=commits)
         synced_commit, remote = self._get_last_sync()
-        all_commits = sorted(self._get_local_commits())
 
         for ind, cl in enumerate(commits_with_logs):
             commit, log = cl
@@ -1481,4 +1492,5 @@ class YARsync():
             _print_error(err)
             returncode = 8
         # in case of other errors, None will be returned!
+        # todo: what code to return for RuntimeError?
         return returncode

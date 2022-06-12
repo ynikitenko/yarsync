@@ -1,21 +1,17 @@
 # -*- coding: utf-8 -*-
-import subprocess
+# Mock OS functions and check that they are called properly
+
 import os
+import subprocess
 import sys
 
 from yarsync import YARsync
 
-# test can be called from the upper directory as well,
-# and the relative name is gotten dynamically.
-TEST_DIR_EMPTY = os.path.dirname(__file__)
-YSDIR = ".ys"
+from .settings import YSDIR
 
 
 def test_init_mixed(mocker):
-    """Mock OS functions and check that they are called properly."""
-    # os.chdir(TEST_DIR_EMPTY)
-
-    ## Mock mixed existing directory and non-existent files ###
+    ## Mock existing directory and non-existent files ###
 
     def _os_path_exists(filepath):
         if filepath == YSDIR:

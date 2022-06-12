@@ -30,7 +30,7 @@ def test_log_empty(mocker):
     call = mocker.call
     assert res == 0
     assert mocker_print.mock_calls == [
-        call.write('# no syncronization information found'),
+        call.write('No syncronization information found.'),
         call.write('\n'),
         call.write('No commits found'), call.write('\n')
     ]
@@ -48,7 +48,7 @@ def test_log(mocker):
     call = mocker.call
     assert res == 0
     assert mocker_print.mock_calls == [
-        call.write('# no syncronization information found'),
+        call.write('No syncronization information found.'),
         call.write('\n'),
         call.write('commit 3 is missing'),
         call.write('\n'),
@@ -74,17 +74,7 @@ def test_log(mocker):
     call = mocker.call
     assert res == 0
     assert mocker_print.mock_calls == [
-        call.write('# no syncronization information found'),
-        # call.write('\n'),
-        # call.write('commit 3 is missing'),
-        # call.write('\n'),
-        # call.write('log 3\n'),
-        # call.write(''),
-        # call.write('\n'),
-        # call.write('commit 2'),
-        # call.write('\n'),
-        # call.write('When: Thu, 01 Jan 1970 03:00:02 MSK\nWhere: user@host\n'),
-        # call.write(''),
+        call.write('No syncronization information found.'),
         call.write('\n'),
         call.write('commit 1'),
         call.write('\n'),
@@ -97,5 +87,4 @@ def test_make_commit_log_list():
     commits = [1, 3]
     logs = [2]
     ys = YARsync(["yarsync", "log"])  # the function is not called
-    mcl = ys._make_commit_list
-    assert mcl(commits, logs) == [(1, None), (None, 2), (3, None)]
+    assert ys._make_commit_list(commits, logs) == [(1, None), (None, 2), (3, None)]

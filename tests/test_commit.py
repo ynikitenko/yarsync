@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-import subprocess
 import os
 import pytest
+import subprocess
 import sys
 import time
 
@@ -110,7 +110,7 @@ def test_existent_commit_exception(mocker):
     mocker.patch("time.time", lambda: 2)
 
     def _os_path_exists(filepath):
-        if YSDIR in filepath:
+        if YSDIR in filepath and not filepath.endswith("MERGE.txt"):
             return True
         return False
 
