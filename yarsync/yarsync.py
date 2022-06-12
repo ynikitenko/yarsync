@@ -1388,6 +1388,10 @@ class YARsync():
                         changed = True
                     print(line.decode("utf-8"), end='')
 
+        sp.wait()  # otherwise returncode might be None
+        # None is fine for sys.exit() though,
+        # because it will be converted to 0.
+        # For testing, it is better to have it 0 here.
         returncode = sp.returncode
 
         if head_commit is not None:
@@ -1476,4 +1480,5 @@ class YARsync():
             # but to IOError in Python 2.
             _print_error(err)
             returncode = 8
+        # in case of other errors, None will be returned!
         return returncode
