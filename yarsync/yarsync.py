@@ -22,6 +22,31 @@ import time
 ## Helper functions ##
 ######################
 
+def _get_root_directory(config_dir_name):
+    """Search for a directory containing *config_dir_name*
+    higher in the file system hierarchy.
+    """
+    cur_path = os.getcwd()
+    # path without symlinks
+    root_path = os.path.realpath(cur_path)
+    # git stops at the file system boundary,
+    # but we ignore that for now.
+    while True:
+        test_path = os.path.join(root_path, config_dir_name)
+        if os.path.exists(test_path):
+            # without trailing slash
+            return root_path
+        if os.path.dirname(root_path) == root_path:
+            # won't work on Windows shares with '\\server\share',
+            # but ignore for now.
+            # https://stackoverflow.com/a/10803459/952234
+            break
+        root_path = os.path.dirname(root_path)
+    raise OSError(
+        "configuration directory {} not found".format(config_dir_name)
+    )
+
+
 def _is_commit(file_name):
     """A *file_name* is a commit if it can be converted to int."""
     try:
@@ -33,7 +58,7 @@ def _is_commit(file_name):
 def _print_error(msg):
     # not a class method, because it can be run
     # when YARsync was not fully initialised yet
-    print("!", msg)
+    print("!", msg, file=sys.stderr)
 
 # copied from https://github.com/DiffSK/configobj/issues/144#issuecomment-347019778
 # with some modifications.
@@ -124,8 +149,10 @@ class YARsync():
         # (but not init or log or status? Or maybe give a hint what's going on?)
         # Oh no, -n with log is number of commits.
 
-        parser.add_argument("-q", "--quiet", action="count",
-                            help="suppress normal output")
+        parser.add_argument("-q", "--quiet",
+                            action="store_true",
+                            # action="count",
+                            help="decrease verbosity")
 
         ############################
         ## Initialize subcommands ##
@@ -305,7 +332,7 @@ class YARsync():
             else:
                 # search the current directory and its parents
                 try:
-                    root_dir = self._get_root_directory(CONFIGDIRNAME)
+                    root_dir = _get_root_directory(CONFIGDIRNAME)
                 except OSError as err:
                     # config dir not found.
                     _print_error(
@@ -444,11 +471,12 @@ class YARsync():
         command_str += " " + " ".join(command_end)
 
         if verbose:
-            print(command_str)
+            self._print_command(command_str)
 
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
 
         # todo: stderr?
+        # todo: verbose/quiet flags?
         for line in iter(sp.stdout.readline, b''):
             print(line.decode("utf-8"), end='')
 
@@ -528,7 +556,7 @@ class YARsync():
         command.append(commit_dir_tmp)
         full_command_str += " " + root_dir + " " + commit_dir_tmp
 
-        self._print(full_command_str)
+        self._print_command(full_command_str)
         # self._print("command =", command, debug=True)
         completed_process = subprocess.Popen(
             command,
@@ -545,12 +573,12 @@ class YARsync():
             return returncode
 
         # commit is done
-        self._print("mv {} {}".format(commit_dir_tmp, commit_dir))
+        self._print_command("mv {} {}".format(commit_dir_tmp, commit_dir))
         os.rename(commit_dir_tmp, commit_dir)
 
         ## log ##
         if not os.path.exists(self.LOGDIR):
-            self._print("mkdir {}".format(self.LOGDIR))
+            self._print_command("mkdir {}".format(self.LOGDIR))
             os.mkdir(self.LOGDIR, self.DIRMODE)
 
         commit_log_name = os.path.join(self.LOGDIR, commit_name + ".txt")
@@ -617,9 +645,10 @@ class YARsync():
         command += [comm2_dir + '/', comm1_dir]
 
         if verbose:
-            print(*command)
+            print_command(*command)
 
         # todo: what about stderr?
+        # todo: verbose/quiet flags
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
         for line in iter(sp.stdout.readline, b''):
             print(line.decode("utf-8"), end='')
@@ -651,6 +680,7 @@ class YARsync():
                 data = fil.readlines()[0].strip()  # remove trailing newline
                 commit, repo = data.split(sep=",", maxsplit=1)
         except OSError:
+            # this is not an error
             self._print("No syncronization information found.")
             return (None, None)
         return (int(commit), repo)
@@ -739,7 +769,7 @@ class YARsync():
         """Return remote commits as a list of integers."""
         command = ["rsync", "--list-only", commit_dir]
 
-        print(" ".join(command))
+        self._print_command(" ".join(command))
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
 
         returncode = sp.returncode
@@ -761,25 +791,6 @@ class YARsync():
 
         return commits
 
-    def _get_root_directory(self, sync_dir):
-        cur_path = os.getcwd()
-        # path without symlinks
-        root_path = os.path.realpath(cur_path)
-        while True:
-            test_path = os.path.join(root_path, sync_dir)
-            if os.path.exists(test_path):
-                # without trailing slash
-                return root_path
-            if os.path.dirname(root_path) == root_path:
-                # won't work on Windows shares with '\\server\share',
-                # but ignore.
-                # https://stackoverflow.com/a/10803459/952234
-                break
-            root_path = os.path.dirname(root_path)
-        raise OSError(
-            "configuration directory {} not found".format(sync_dir)
-        )
-
     def _init(self):
         """Initialize default configuration.
 
@@ -791,13 +802,14 @@ class YARsync():
         # todo: create example configuration file.
         ysdir = self.config_dir
         repofile = self.REPOFILE
+        # reponame will be written to repofile and used in logs.
         reponame = self.reponame
 
-        self._print("# init configuration for {}".format(reponame))
+        self._print("init configuration for {}".format(reponame))
 
         # create config_dir
         if not os.path.exists(ysdir):
-            self._print("mkdir {}".format(ysdir))
+            self._print_command("mkdir -m {:o} {}".format(self.DIRMODE, ysdir))
             # can raise "! [Errno 13] Permission denied: '.ys'"
             os.mkdir(ysdir, self.DIRMODE)
         else:
@@ -954,8 +966,13 @@ class YARsync():
         debug = kwargs.pop("debug", False)
         if debug and not self.DEBUG:
             return
-        # print(str(stdoutdata, 'utf-8'), end="")
-        print(*args, **kwargs)
+        if self._args.quiet:
+            return
+        print("#", *args, **kwargs)
+
+    def _print_command(self, comm):
+        """Same as print, but without a leading hash."""
+        print(comm)
 
     def _print_log(self, commit, log, synced_commit=None, remote=None, head_commit=None):
         if commit is None:
@@ -980,7 +997,8 @@ class YARsync():
             # read returns a redundant newline
             log_str = log_file.read()
             # print("log_str: '{}'".format(log_str))
-        self._print(commit_str, log_str, sep='\n', end='')
+        print(commit_str, log_str, sep='\n', end='')
+        # self._print(commit_str, log_str, sep='\n', end='')
 
     def _pull_push(self):
         """Push/pull commits to/from destination or source.
@@ -1008,7 +1026,7 @@ class YARsync():
                 "Manually update the working directory and *commit*."
             )
 
-        returncode, changed = self._status(check_changed=True, verbose=False)
+        returncode, changed = self._status(check_changed=True)
         if changed:
             raise OSError("local repository has uncommitted changes")
         if returncode:
@@ -1065,7 +1083,7 @@ class YARsync():
             command_str += " {} {}".format(full_destpath, root_path)
 
         # self._print("#", command, debug=True)
-        self._print("#", command_str)
+        self._print_command(command_str)
 
         # old local commits (before possible pull)
         local_commits = list(self._get_local_commits())
@@ -1121,7 +1139,7 @@ class YARsync():
                 # remote commits are within locals (except some old ones)
                 # update the working directory
                 self._checkout(max(local_commits))
-                print("remote commits automatically merged")
+                self._print("remote commits automatically merged")
             else:
                 # remote commits diverged, need to merge them manually
                 common_commits = set(local_commits)\
@@ -1144,9 +1162,11 @@ class YARsync():
                             "create that manually with " + merge_str
                         )
                         raise OSError from None
-                print("merge {} and {} manually and commit "
-                      "(most recent common commit is {})".\
-                      format(max(local_commits), last_remote_comm, common_comm))
+                self._print(
+                    "merge {} and {} manually and commit "
+                    "(most recent common commit is {})".\
+                    format(max(local_commits), last_remote_comm, common_comm)
+                )
 
         if not new and not dry_run:
             # --new means we've not fully synchronized yet
@@ -1161,7 +1181,7 @@ class YARsync():
                     print(sync_str, end="", file=fil)
             except OSError:
                 _print_error("data transferred, but could not log to {}"
-                                  .format(self.SYNCFILENAME))
+                             .format(self.SYNCFILENAME))
 
             # either HEAD was correct ("not detached") (for push)
             # or it was updated (by pull)
@@ -1261,7 +1281,7 @@ class YARsync():
             previous_commit = all_commits[commit_ind - 1]
             self._diff(commit, previous_commit)
 
-    def _status(self, check_changed=False, verbose=True):
+    def _status(self, check_changed=False):
         """Print files and directories that were updated more recently
         than last commit.
 
@@ -1273,13 +1293,12 @@ class YARsync():
         return a tuple *(returncode, changed)*,
         where *changed* is `True`
         if the working directory has changes since last commit.
-
-        If *verbose* is `False`,
-        output is printed only in case of changes.
         """
         # We don't return an error if the directory has changed,
         # because it is a normal situation (not an error).
         # This is the same as in git.
+
+        quiet = self._args.quiet
 
         if os.path.exists(self.COMMITDIR):
             commit_subdirs = [fil for fil in os.listdir(self.COMMITDIR)
@@ -1289,7 +1308,6 @@ class YARsync():
 
         ## no commits is fine for an initial commit
         if not commit_subdirs:
-            # if verbose:
             print("No commits found")
             if check_changed:
                 return (0, True)
@@ -1324,7 +1342,7 @@ class YARsync():
         command += command_end
         command_str += " " + " ".join(command_end)
 
-        if verbose:
+        if not quiet:
             print(command_str)
 
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
@@ -1341,6 +1359,7 @@ class YARsync():
                 # skip permissions
                 if not line.startswith(b'.'):
                 # if not line.startswith(b'.d..t......'):
+                    # todo: shall we return here if only check_changed?
                     changed = True
 
                 # print the line and all following lines.
@@ -1374,12 +1393,14 @@ class YARsync():
             commits = list(self._get_local_commits())
             last_commit = self._get_last_commit(commits)
             if synced_commit == last_commit:
-                self._print("\nCommits are up to date with {}."\
+                print("\nCommits are up to date with {}."\
                             .format(repo))
             else:
                 n_newer_commits = sum([1 for comm in commits
                                        if comm > synced_commit])
-                self._print("# local repository is {} commits ahead of {}"\
+                # here we print a hash
+                # to distinguish this line from others
+                print("# local repository is {} commits ahead of {}"\
                             .format(n_newer_commits, repo))
 
         # called from an internal method
