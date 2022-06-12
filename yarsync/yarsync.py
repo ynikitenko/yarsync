@@ -55,10 +55,13 @@ def _is_commit(file_name):
         return False
     return True
 
+
 def _print_error(msg):
     # not a class method, because it can be run
-    # when YARsync was not fully initialised yet
+    # when YARsync was not fully initialised yet.
+    # Will not work in Python 2 (if I ever use that here).
     print("!", msg, file=sys.stderr)
+
 
 # copied from https://github.com/DiffSK/configobj/issues/144#issuecomment-347019778
 # with some modifications.
@@ -150,8 +153,8 @@ class YARsync():
         # Oh no, -n with log is number of commits.
 
         parser.add_argument("-q", "--quiet",
-                            action="store_true",
-                            # action="count",
+                            action="count",
+                            default=0,
                             help="decrease verbosity")
 
         ############################
@@ -418,6 +421,7 @@ class YARsync():
         elif args.command_name == "push":
             args._remote = args.destination
 
+        self.print_level = 2 - args.quiet
         self._args = args
 
         # self._parser = parser
@@ -799,37 +803,50 @@ class YARsync():
         If a configuration file already exists, it is not changed.
         This operation is safe and idempotent (can be repeated safely).
         """
-        # todo: create example configuration file.
         ysdir = self.config_dir
         repofile = self.REPOFILE
         # reponame will be written to repofile and used in logs.
         reponame = self.reponame
 
-        self._print("init configuration for {}".format(reponame))
+        self._print("Initialise configuration for {}".format(reponame), level=2)
 
         # create config_dir
+        new_config = True
         if not os.path.exists(ysdir):
             self._print_command("mkdir -m {:o} {}".format(self.DIRMODE, ysdir))
             # can raise "! [Errno 13] Permission denied: '.ys'"
             os.mkdir(ysdir, self.DIRMODE)
         else:
-            self._print("{} already exists, skip".format(ysdir))
+            self._print("{} already exists, skip".format(ysdir), level=2)
+            new_config = False
 
         # create self.CONFIGFILE
+        # todo: create example configuration file.
         if not os.path.exists(self.CONFIGFILE):
-            self._print("create configuration file {}".format(self.CONFIGFILE))
+            self._print("# create configuration file {}".format(self.CONFIGFILE))
             with open(self.CONFIGFILE, "w") as fil:
                 print("", end="", file=fil)
+            new_config = True
         else:
-            self._print("{} already exists, skip".format(self.CONFIGFILE))
+            self._print("{} already exists, skip".format(self.CONFIGFILE),
+                        level=2)
 
         # create self.REPOFILE
         if not os.path.exists(repofile):
-            self._print("create configuration file {}".format(repofile))
+            self._print("# create configuration file {}".format(repofile))
             with open(repofile, "w") as fil:
                 print(reponame, end="", file=fil)
+            new_config = True
         else:
-            self._print("{} already exists, skip".format(repofile))
+            self._print("{} already exists, skip".format(repofile), level=2)
+
+        ysdir_fp = os.path.realpath(ysdir)
+        if new_config:
+            self._print("\nInitialised yarsync configuration in {} "
+                        .format(ysdir_fp))
+        else:
+            self._print("\nConfiguration in {} already initialised."
+                        .format(ysdir_fp))
 
         return 0
 
@@ -962,17 +979,20 @@ class YARsync():
         # in fact, sys.exit(None) still returns 0 to the shell
         return 0
 
-    def _print(self, *args, **kwargs):
-        debug = kwargs.pop("debug", False)
-        if debug and not self.DEBUG:
+    def _print(self, *args, level=1, **kwargs):
+        """Print output messages."""
+        if level > self.print_level:
             return
-        if self._args.quiet:
-            return
-        print("#", *args, **kwargs)
+        if level >= 2:
+            print("# ", end='')
+        print(*args, **kwargs)
 
     def _print_command(self, comm):
-        """Same as print, but without a leading hash."""
-        print(comm)
+        """Print called commands."""
+        # A separate function
+        # to semantically distinguish that from _print in code.
+        # However, _print is used internally - to handle output levels.
+        self._print(comm)
 
     def _print_log(self, commit, log, synced_commit=None, remote=None, head_commit=None):
         if commit is None:
@@ -1298,8 +1318,6 @@ class YARsync():
         # because it is a normal situation (not an error).
         # This is the same as in git.
 
-        quiet = self._args.quiet
-
         if os.path.exists(self.COMMITDIR):
             commit_subdirs = [fil for fil in os.listdir(self.COMMITDIR)
                               if _is_commit(fil)]
@@ -1308,7 +1326,7 @@ class YARsync():
 
         ## no commits is fine for an initial commit
         if not commit_subdirs:
-            print("No commits found")
+            self._print("No commits found")
             if check_changed:
                 return (0, True)
             return 0
@@ -1342,8 +1360,7 @@ class YARsync():
         command += command_end
         command_str += " " + " ".join(command_end)
 
-        if not quiet:
-            print(command_str)
+        self._print(command_str, level=2)
 
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
         # changed means there were actual changes in the working dir
@@ -1355,7 +1372,7 @@ class YARsync():
         lines = iter(sp.stdout.readline, b'')
         for line in lines:
             if line:
-                print("Changed since head commit:")
+                self._print("Changed since head commit:")
                 # skip permissions
                 if not line.startswith(b'.'):
                 # if not line.startswith(b'.d..t......'):
@@ -1374,18 +1391,18 @@ class YARsync():
         returncode = sp.returncode
 
         if head_commit is not None:
-            print("\nDetached HEAD (see '{} log' for more recent commits)"
-                  .format(self.NAME))
+            self._print("\nDetached HEAD (see '{} log' for more recent commits)"
+                        .format(self.NAME))
 
         if os.path.exists(self.MERGEFILENAME):
             with open(self.MERGEFILENAME, "r") as fil:
                 merge_str = fil.readlines()[0].strip()
             merges = merge_str.split(',')
-            print("Merging {} and {} (most recent common commit {})."\
-                  .format(*merges))
+            self._print("Merging {} and {} (most recent common commit {})."\
+                        .format(*merges))
 
         if not changed:
-            print("Nothing to commit, working directory clean.")
+            self._print("Nothing to commit, working directory clean.")
 
         synced_commit, repo = self._get_last_sync()
 
@@ -1393,14 +1410,14 @@ class YARsync():
             commits = list(self._get_local_commits())
             last_commit = self._get_last_commit(commits)
             if synced_commit == last_commit:
-                print("\nCommits are up to date with {}."\
+                self._print("\nCommits are up to date with {}."\
                             .format(repo))
             else:
                 n_newer_commits = sum([1 for comm in commits
                                        if comm > synced_commit])
                 # here we print a hash
                 # to distinguish this line from others
-                print("# local repository is {} commits ahead of {}"\
+                self._print("# local repository is {} commits ahead of {}"\
                             .format(n_newer_commits, repo))
 
         # called from an internal method
