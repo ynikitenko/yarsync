@@ -7,12 +7,12 @@ import time
 # from io import StringIO
 
 from yarsync import YARsync
-from settings import TEST_DIR, TEST_DIR_EMPTY, TEST_DIR_NO_PERMS, YSDIR
+from .settings import TEST_DIR, TEST_DIR_EMPTY, YSDIR
 
 
-def test_status_error(mocker):
+def test_status_error(mocker, test_dir_read_only):
     """Test a not-yarsync directory."""
-    os.chdir(TEST_DIR_NO_PERMS)
+    os.chdir(test_dir_read_only)
     mocker_print = mocker.patch("sys.stdout")
     call = mocker.call
 

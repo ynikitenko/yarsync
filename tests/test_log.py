@@ -4,12 +4,12 @@ import pytest
 import sys
 
 from yarsync import YARsync
-from settings import TEST_DIR, TEST_DIR_EMPTY, TEST_DIR_NO_PERMS
+from .settings import TEST_DIR, TEST_DIR_EMPTY
 
 
-def test_log_error():
+def test_log_error(test_dir_read_only):
     """Test a not-yarsync directory."""
-    os.chdir(TEST_DIR_NO_PERMS)
+    os.chdir(test_dir_read_only)
 
     args = ["yarsync", "log"]
     with pytest.raises(OSError) as err:

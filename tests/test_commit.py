@@ -7,7 +7,7 @@ import time
 
 from yarsync import YARsync
 
-from settings import TEST_DIR_EMPTY, YSDIR
+from .settings import TEST_DIR_EMPTY, YSDIR
 
 
 def test_commit(mocker):

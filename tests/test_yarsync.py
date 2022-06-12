@@ -5,21 +5,14 @@ import os
 from yarsync import YARsync
 from yarsync.yarsync import _is_commit
 
-from settings import TEST_DIR, TEST_DIR_NO_PERMS
+from .settings import TEST_DIR
 
 
-def test_error():
-    if not os.path.exists(TEST_DIR_NO_PERMS):
-        # git doesn't preserve permissions,
-        # so we recreate this ourselves.
-        # It's safe to call mkdir on non-Linux systems.
-        # Docs write that permissions are ignored in that case
-        # (however the test shall then fail)
-        os.mkdir(TEST_DIR_NO_PERMS, 0o555)
-    os.chdir(TEST_DIR_NO_PERMS)
+def test_error(test_dir_read_only):
+    os.chdir(test_dir_read_only)
     ys = YARsync(["yarsync", "init"])
+    # error messages are reasonable, so we don't test them here.
     returncode = ys()
-    print("if this test fails, check that permissions are correct")
     assert returncode == 8
 
 

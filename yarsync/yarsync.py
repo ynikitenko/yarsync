@@ -798,6 +798,7 @@ class YARsync():
         # create config_dir
         if not os.path.exists(ysdir):
             self._print("mkdir {}".format(ysdir))
+            # can raise "! [Errno 13] Permission denied: '.ys'"
             os.mkdir(ysdir, self.DIRMODE)
         else:
             self._print("{} already exists, skip".format(ysdir))
