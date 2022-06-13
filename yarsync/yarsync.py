@@ -251,7 +251,7 @@ class YARsync():
                  "but do not make any change"
         )
         # we don't allow pushing new files to remote,
-        # because that would cause its unconsistent state
+        # because that could cause its inconsistent state
         # (while locally we merge new files manually)
         # parser_push.add_argument(
         #     "--new", action="store_true",
@@ -271,7 +271,12 @@ class YARsync():
             # action="count",
             help="be verbose"
         )
-        subparsers_remote = parser_remote.add_subparsers(dest="remote_command")
+        subparsers_remote = parser_remote.add_subparsers(
+            title="remote commands",
+            dest="remote_command",
+            help="type 'yarsync remote <command> --help' for additional help",
+            metavar="command",
+        )
 
         # parse_intermixed_args is missing in Python 2,
         # that's why we allow -v flag only after 'remote'.
@@ -281,21 +286,33 @@ class YARsync():
         #     "-v", "--verbose", action="count",
         #     help="show remote paths. Insert after a remote command"
         # )
-        ## add
-        parser_remote_add = subparsers_remote.add_parser("add")
+        ## remote add
+        parser_remote_add = subparsers_remote.add_parser(
+            "add", help="add remote"
+        )
         parser_remote_add.add_argument(
-            "repo", nargs="+", help="repository name [path [options]]",
+            "repository", help="repository name",
+            # metavar="name"
+        )
+        parser_remote_add.add_argument(
+            "path", help="repository path",
             # metavar=("name", "path", "options")
         )
-        ## rm
-        parser_remote_rm = subparsers_remote.add_parser("rm")
+        parser_remote_add.add_argument(
+            "options", nargs='*', help="repository options",
+            # metavar=("name", "path", "options")
+        )
+        ## remote rm
+        parser_remote_rm = subparsers_remote.add_parser(
+            "rm", help="remove remote"
+        )
 
         for subparser in [parser_remote_add, parser_remote_rm]:
             subparser.set_defaults(func=self._remote)
 
-        # show, default
+        ## remote show, default
         parser_remote_show = subparsers_remote.add_parser(
-            "show"
+            "show", help="print remote"
             # "show", parents=[remote_parent_parser]
         )
         parser_remote_show.set_defaults(func=self._remote_show)
@@ -333,10 +350,10 @@ class YARsync():
 
         # basename, because ipython may print full path
         self.NAME = os.path.basename(argv[0])  # "yarsync"
-        # todo: this file should contain repository name.
-        # I think that would be better to move this to config.
+        # this file contains repository name
         self.REPOFILENAME = "repository.txt"
-        # directory with metadata
+        # directory with commits and other metadata
+        # (may be updated by command line arguments)
         CONFIGDIRNAME = ".ys"
 
         root_dir = os.path.expanduser(args.root_dir)
@@ -388,12 +405,13 @@ class YARsync():
         # stores last synchronized commit
         self.SYNCFILENAME = os.path.join(self.config_dir, "sync.txt")
 
-        # not used anywhere
-        # self.DEBUG = True
-
-        if args.command_name in ['pull', 'push', 'remote']:
-        # if args.command_name not in ['checkout', 'diff', 'init', 'log', 'show',
-        #                              'status']:
+        ## Check for CONFIGFILE
+        if (args.command_name in ['pull', 'push']
+            or (args.command_name == "remote"
+                and args.remote_command != "add")
+        ):
+        # 'checkout', 'diff', 'init', 'log', 'show', 'status'
+        # work fine without config.
             if not os.path.exists(self.CONFIGFILE):
                 _print_error(
                     "fatal: no {} configuration {} found".
@@ -412,8 +430,6 @@ class YARsync():
         #########################
         ## Initialize commands ##
         #########################
-
-        # print(args =", args)
 
         # it seems there is no easy way to set a default command
         # for a subparser
@@ -1261,29 +1277,36 @@ class YARsync():
         # return configdict
 
     def _remote(self):
+        """Since self._func() is called without arguments,
+        this is the place for all remote-related operations.
+        """
         if self._args.remote_command == "add":
-            repo = self._args.repo
-            if len(repo) < 2:
-                _print_error(
-                    "repository name and path must be provided"
-                )
-                return 7
-            self._remote_add(*repo)
+            repository = self._args.repository
+            path = self._args.path
+            options = self._args.options
+            returncode = self._remote_add(repository, path, options)
         elif self._args.remote_command == "rm":
-            self._remote_rm(self._args.repo)
-        return 0
+            returncode = self._remote_rm(self._args.repo)
+        return returncode
 
     def _remote_add(self, remote, path, options=""):
         """Add a remote and its path to the config file."""
         # from https://docs.python.org/2.7/library/configparser.html#examples
         config = configparser.RawConfigParser()
-        # todo: must check for existing sections.
-        # and also allow for missing file.
-        config.add_section(remote)
+        config.read(self.CONFIGFILE)
+        try:
+            config.add_section(remote)
+        except configparser.DuplicateSectionError:
+            _print_error(
+                "remote {} exists, break.\n  Remove {} "
+                "or choose a new remote name.".format(remote, remote)
+            )
+            return 7
         config.set(remote, "path", path)
+        # todo: options not implemented
         if options:
             config.set(remote, "options", options)
-        with open(self.CONFIGFILE, "a") as configfile:
+        with open(self.CONFIGFILE, "w") as configfile:
             config.write(configfile)
 
     def _remote_rm(self, remote):
