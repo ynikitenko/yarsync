@@ -117,24 +117,28 @@ class YARsync():
     def __init__(self, argv):
         """*argv* is the list of command line arguments."""
 
-        parser = argparse.ArgumentParser(description='sync directories')
+        parser = argparse.ArgumentParser(
+            description="synchronize directories"
+        )
         subparsers = parser.add_subparsers(
-            title='commands',
-            dest='command_name',
-            description='valid commands',
-            help='additional help'
+            title="Available commands",
+            dest="command_name",
+            # description="valid commands",
+            help="type 'yarsync <command> --help' for additional help",
+            # or will print a list of commands in curly braces.
+            metavar="command",
         )
 
         ###################################
         ## Initialize optional arguments ##
         ###################################
         # or ys_dir
-        parser.add_argument('--config-dir', default="",
+        parser.add_argument("--config-dir", default="",
                             help="path to the configuration directory")
-        parser.add_argument('--root-dir', default="",
+        parser.add_argument("--root-dir", default="",
                             help="path to the root of the working directory")
 
-        parser.add_argument('-D', '--destname',
+        parser.add_argument("-D", "--destname",
                             help="destination name used for logging")
         ## host = target = destination name,
         ## or source name during yarsync init.
@@ -146,7 +150,7 @@ class YARsync():
             "-n", "--dry-run", action="store_true",
             default=False,
             help="print what would be transferred during a real run, "
-                 "but don't make any changes"
+                 "but do not make any changes"
         )
         # I think this should work with push, pull, and anything involving rsync
         # (but not init or log or status? Or maybe give a hint what's going on?)
@@ -164,7 +168,9 @@ class YARsync():
 
         # checkout #
         parser_checkout = subparsers.add_parser(
-            "checkout", help="check out a commit"
+            "checkout",
+            help="check out a commit"
+            # help="restore the working directory to a local commit"
         )
         parser_checkout.add_argument(
             "-n", "--dry-run", action="store_true",
@@ -176,15 +182,16 @@ class YARsync():
         parser_checkout.set_defaults(func=self._checkout)
 
         # commit #
-        parser_commit = subparsers.add_parser("commit",
-                                              help="commit changes")
+        parser_commit = subparsers.add_parser(
+            "commit", help="commit the working directory"
+        )
         parser_commit.add_argument("-m", "--message", default="",
                                    help="commit message")
         parser_commit.set_defaults(func=self._commit)
 
         # diff #
         parser_status = subparsers.add_parser(
-            "diff", help="print difference between two commits"
+            "diff", help="print the difference between two commits"
         )
         parser_status.add_argument("commit", help="commit name")
         parser_status.add_argument("other_commit", nargs="?", default=None,
@@ -193,31 +200,31 @@ class YARsync():
 
         # init #
         parser_init = subparsers.add_parser("init",
-                                            help="initialize a repository")
+                                            help="initialise a repository")
         parser_init.add_argument("reponame", nargs="?",
-                                 help="name of the created repository")
+                                 help="name of the local initialised repository")
         parser_init.set_defaults(func=self._init)
 
         # log #
         parser_log = subparsers.add_parser(
-            "log", help="show commit logs"
+            "log", help="print commit logs"
         )
         parser_log.add_argument(
             "-n", "--max-count", metavar="<number>", type=int,
             default=-1,
-            help="name of the created repository"
+            help="maximum number of logs shown"
         )
         parser_log.add_argument("-r", "--reverse", action="store_true",
-                                help="reverse the order of output")
+                                help="reverse the order of the output")
         parser_log.set_defaults(func=self._log)
 
         # pull #
         parser_pull = subparsers.add_parser(
-            "pull", help="update data from the source"
+            "pull", help="fetch data from the source"
         )
         parser_pull.add_argument(
             "--new", action="store_true",
-            help="don't remove files here that are missing on source"
+            help="do not remove files here that are missing on source"
         )
         parser_pull.add_argument("source", nargs="?",
                                  help="source name or path")
@@ -225,13 +232,13 @@ class YARsync():
             "-n", "--dry-run", action="store_true",
             default=False,
             help="print what would be transferred during a real run, "
-                 "but don't make any change"
+                 "but do not make any change"
         )
         parser_pull.set_defaults(func=self._pull_push)
 
         # push #
         parser_push = subparsers.add_parser(
-            "push", help="update data on the destination"
+            "push", help="send data to the destination"
         )
         parser_push.add_argument(
             "-f", "--force", action="store_true",
@@ -241,7 +248,7 @@ class YARsync():
             "-n", "--dry-run", action="store_true",
             default=False,
             help="print what would be transferred during a real run, "
-                 "but don't make any change"
+                 "but do not make any change"
         )
         # we don't allow pushing new files to remote,
         # because that would cause its unconsistent state
@@ -290,7 +297,7 @@ class YARsync():
 
         # show #
         parser_status = subparsers.add_parser(
-            "show", help="print log message and actual changes for commit(s)"
+            "show", help="print log messages and actual changes for commit(s)"
         )
         parser_status.add_argument("commit", nargs="+",
                                    help="commit name")
@@ -330,7 +337,7 @@ class YARsync():
         root_dir = os.path.expanduser(args.root_dir)
         config_dir = os.path.expanduser(args.config_dir)
         if not root_dir and not config_dir:
-            if args.command_name == 'init':
+            if args.command_name == "init":
                 root_dir = "."
                 config_dir = CONFIGDIRNAME
             else:
