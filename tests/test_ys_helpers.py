@@ -4,8 +4,19 @@ import os
 
 from yarsync import YARsync
 from yarsync.yarsync import _is_commit
+from yarsync.yarsync import _substitute_env
 
 from .settings import TEST_DIR
+
+
+def test_env_vars():
+    os.environ["VAR"] = "var"
+    # variable substitution works for several lines
+    lines = "[]\npath=$VAR/maybe"
+    assert _substitute_env(lines).getvalue() == "[]\npath=var/maybe"
+    # unset variable is not substituted
+    lines = "[]\npath=$VAR1/maybe"
+    assert _substitute_env(lines).getvalue() == "[]\npath=$VAR1/maybe"
 
 
 def test_error(test_dir_read_only):
@@ -16,16 +27,16 @@ def test_error(test_dir_read_only):
     assert returncode == 8
 
 
-def test_is_commit():
-    assert _is_commit("1") is True
-    assert _is_commit("01") is True
-    assert _is_commit("abc") is False
-
-
 def test_init():
     os.chdir(TEST_DIR)
     init_utf8 = YARsync("yarsync init источник".split())
     assert init_utf8.reponame == "источник"
+
+
+def test_is_commit():
+    assert _is_commit("1") is True
+    assert _is_commit("01") is True
+    assert _is_commit("abc") is False
 
 
 def test_print(mocker):

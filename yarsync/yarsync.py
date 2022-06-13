@@ -266,10 +266,12 @@ class YARsync():
             "remote", help="manage remote repositories"
         )
         parser_remote.add_argument(
-            "-v", "--verbose", action="count",
-            help="show remote paths. Insert after 'remote'"
+            "-v", "--verbose",
+            action="store_true",
+            # action="count",
+            help="be verbose"
         )
-        subparsers_remote = parser_remote.add_subparsers(dest="command")
+        subparsers_remote = parser_remote.add_subparsers(dest="remote_command")
 
         # parse_intermixed_args is missing in Python 2,
         # that's why we allow -v flag only after 'remote'.
@@ -280,28 +282,31 @@ class YARsync():
         #     help="show remote paths. Insert after a remote command"
         # )
         ## add
-        remote_add = subparsers_remote.add_parser("add")
+        parser_remote_add = subparsers_remote.add_parser("add")
+        parser_remote_add.add_argument(
+            "repo", nargs="+", help="repository name [path [options]]",
+            # metavar=("name", "path", "options")
+        )
         ## rm
-        remote_rm = subparsers_remote.add_parser("rm")
+        parser_remote_rm = subparsers_remote.add_parser("rm")
+
+        for subparser in [parser_remote_add, parser_remote_rm]:
+            subparser.set_defaults(func=self._remote)
+
         # show, default
-        remote_show = subparsers_remote.add_parser(
+        parser_remote_show = subparsers_remote.add_parser(
             "show"
             # "show", parents=[remote_parent_parser]
         )
-        remote_show.set_defaults(func=self._remote_show)
-
-        # it seems a parser doesn't know its subparsers,
-        # no function is given in docs
-        for subparser in [remote_add, remote_rm]:
-            subparser.set_defaults(func=self._remote)
+        parser_remote_show.set_defaults(func=self._remote_show)
 
         # show #
-        parser_status = subparsers.add_parser(
+        parser_show = subparsers.add_parser(
             "show", help="print log messages and actual changes for commit(s)"
         )
-        parser_status.add_argument("commit", nargs="+",
+        parser_show.add_argument("commit", nargs="+",
                                    help="commit name")
-        parser_status.set_defaults(func=self._show)
+        parser_show.set_defaults(func=self._show)
 
         # status #
         parser_status = subparsers.add_parser(
@@ -412,7 +417,7 @@ class YARsync():
 
         # it seems there is no easy way to set a default command
         # for a subparser
-        if args.command_name == "remote" and args.command is None:
+        if args.command_name == "remote" and args.remote_command is None:
             self._func = self._remote_show
         else:
             self._func = args.func
@@ -432,15 +437,6 @@ class YARsync():
 
         self.print_level = 2 - args.quiet
         self._args = args
-
-    def _add_remote(self, remote, path):
-        """Add a remote and its path to the config file."""
-        # from https://docs.python.org/2.7/library/configparser.html#examples
-        config = configparser.RawConfigParser()
-        config.add_section(remote)
-        config.set(remote, "path", path)
-        with open(self.CONFIGFILE, "a") as configfile:
-            config.write(configfile)
 
     def _checkout(self, commit=None):
         """Checkout a commit.
@@ -896,14 +892,8 @@ class YARsync():
             commits = sorted(self._get_local_commits())
         else:
             commits = sorted(commits)
-            # this check has nothing to do with the function logic.
-            # # check that all commits exist
-            # for commit in commits:
-            #     if commit not in local_commits:
-            #         raise ValueError(
-            #             "no commit {} found".format(commit)
-            #         )
-            #
+            # note that we don't check whether these commits
+            # actually exist. This function logic doesn't require that.
             # todo: allow commits in the defined order.
             # that would require first yielding all commits,
             # then all logs without commits. Looks good.
@@ -1271,11 +1261,33 @@ class YARsync():
         # return configdict
 
     def _remote(self):
-        if sys.argv[2] == "add":
-            self._add_remote(sys.argv[3], sys.argv[4])
-        elif sys.argv[2] == "-v":
-            _print_remotes()
-            return 0
+        if self._args.remote_command == "add":
+            repo = self._args.repo
+            if len(repo) < 2:
+                _print_error(
+                    "repository name and path must be provided"
+                )
+                return 7
+            self._remote_add(*repo)
+        elif self._args.remote_command == "rm":
+            self._remote_rm(self._args.repo)
+        return 0
+
+    def _remote_add(self, remote, path, options=""):
+        """Add a remote and its path to the config file."""
+        # from https://docs.python.org/2.7/library/configparser.html#examples
+        config = configparser.RawConfigParser()
+        # todo: must check for existing sections.
+        # and also allow for missing file.
+        config.add_section(remote)
+        config.set(remote, "path", path)
+        if options:
+            config.set(remote, "options", options)
+        with open(self.CONFIGFILE, "a") as configfile:
+            config.write(configfile)
+
+    def _remote_rm(self, remote):
+        pass
 
     def _remote_show(self):
         """Print names of remotes. If verbose, print paths as well."""
