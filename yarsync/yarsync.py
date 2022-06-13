@@ -306,9 +306,12 @@ class YARsync():
         parser_remote_rm = subparsers_remote.add_parser(
             "rm", help="remove remote"
         )
+        parser_remote_rm.add_argument(
+            "repository", help="repository name",
+        )
 
-        for subparser in [parser_remote_add, parser_remote_rm]:
-            subparser.set_defaults(func=self._remote)
+        for remote_subparser in [parser_remote_add, parser_remote_rm]:
+            remote_subparser.set_defaults(func=self._remote)
 
         ## remote show, default
         parser_remote_show = subparsers_remote.add_parser(
@@ -1231,10 +1234,8 @@ class YARsync():
 
     def _read_config(self):
 
-        # substitute environmental variables (if present and available)
-        # todo: many problems. Env variables don't have to be available
-        # for all sections. On the other hand, they must be present
-        # for the options currently used.
+        # substitute environmental variables (those that are available)
+        # todo: what if an envvar is not present for the current section?
         with open(self.CONFIGFILE, "r") as conf_file:
             subst_lines = _substitute_env(conf_file.read()).getvalue()
 
@@ -1243,9 +1244,6 @@ class YARsync():
         # is undocumented in Python2, but present!
         config.read_string(subst_lines)
 
-        # not sure whether I need this
-        config["DEFAULT"]["srcpath"] = self.root_dir  # "./"
-        config["DEFAULT"]["exclude"] = self.config_dir
         configdict = {}
         for section in config.sections():
             sectiond = dict(config[section])
@@ -1259,8 +1257,7 @@ class YARsync():
                 host = sectiond["host"]
             except KeyError:
                 # sections for remotes can be named after their hosts
-                host = section
-            # host = self._get_remote_host(section)
+                host = ""  # section
             destpath = sectiond["path"]
             sectiond["destpath"] = _mkhostpath(host, destpath)
 
@@ -1272,22 +1269,18 @@ class YARsync():
         # config.items() includes the DEFAULT section, which can't be removed.
         self._config = config
         self._configdict = configdict
-        # return would be more flexible if the path to config was passed
-        # as an argument to this function
-        # return configdict
 
     def _remote(self):
-        """Since self._func() is called without arguments,
-        this is the place for all remote-related operations.
-        """
+        """Manage remotes."""
+        # Since self._func() is called without arguments,
+        # this is the place for all remote-related operations.
         if self._args.remote_command == "add":
             repository = self._args.repository
             path = self._args.path
             options = self._args.options
-            returncode = self._remote_add(repository, path, options)
+            return self._remote_add(repository, path, options)
         elif self._args.remote_command == "rm":
-            returncode = self._remote_rm(self._args.repo)
-        return returncode
+            return self._remote_rm(self._args.repository)
 
     def _remote_add(self, remote, path, options=""):
         """Add a remote and its path to the config file."""
@@ -1308,19 +1301,36 @@ class YARsync():
             config.set(remote, "options", options)
         with open(self.CONFIGFILE, "w") as configfile:
             config.write(configfile)
+        self._print("Remote {} added.".format(remote))
+        return 0
 
     def _remote_rm(self, remote):
-        pass
+        """Remove a *remote*."""
+        config = self._config
+        try:
+            del config[remote]
+        except KeyError:
+            _print_error(
+                "no remote {} found, exit".format(remote)
+            )
+            return 7
+        with open(self.CONFIGFILE, "w") as configfile:
+            config.write(configfile)
+        self._print("Remote {} removed.".format(remote))
+        return 0
 
     def _remote_show(self):
         """Print names of remotes. If verbose, print paths as well."""
-        config = self._configdict
+        # that might be useful to specify a remote name,
+        # but git doesn't do that, and we won't.
         if self._args.verbose:
-            for section, options in config.items():
+            for section, options in self._configdict.items():
                 print(section, options["destpath"], sep="\t")
         else:
             for section in self._config.sections():
                 print(section)
+        if not self._config.sections():
+            self._print("No remotes found.")
 
     def _show(self, commits=None):
         """Show commit(s).
