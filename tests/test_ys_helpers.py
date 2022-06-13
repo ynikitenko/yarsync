@@ -27,12 +27,6 @@ def test_error(test_dir_read_only):
     assert returncode == 8
 
 
-def test_init():
-    os.chdir(TEST_DIR)
-    init_utf8 = YARsync("yarsync init источник".split())
-    assert init_utf8.reponame == "источник"
-
-
 def test_is_commit():
     assert _is_commit("1") is True
     assert _is_commit("01") is True

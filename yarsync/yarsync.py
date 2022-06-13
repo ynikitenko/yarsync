@@ -434,27 +434,20 @@ class YARsync():
         ## Initialize commands ##
         #########################
 
-        # it seems there is no easy way to set a default command
-        # for a subparser
+        # there is no easy way to set a default command
+        # for a subparser, https://stackoverflow.com/a/46964652/952234
         if args.command_name == "remote" and args.remote_command is None:
             self._func = self._remote_show
         else:
             self._func = args.func
 
-        if args.command_name == "init":
-            reponame = args.reponame
-            if reponame is None:
-                reponame = socket.gethostname()
-            # todo: what if reponame is empty?
-            # probably ask interactively or ask
-            # for a command line option.
-            self.reponame = reponame
-        elif args.command_name == "pull":
+        if args.command_name == "pull":
             args._remote = args.source
         elif args.command_name == "push":
             args._remote = args.destination
 
         self.print_level = 2 - args.quiet
+
         self._args = args
 
     def _checkout(self, commit=None):
@@ -831,10 +824,23 @@ class YARsync():
         """
         ysdir = self.config_dir
         repofile = self.REPOFILE
-        # reponame will be written to repofile and used in logs.
-        reponame = self.reponame
 
-        self._print("Initialise configuration for {}".format(reponame), level=2)
+        # reponame will be written to repofile and used in logs.
+        reponame = self._args.reponame
+        reponame_from_args = True
+        if reponame is None:
+            reponame = socket.gethostname()
+            reponame_from_args = False
+        if not reponame:
+            _print_error(
+                "provide a repository name (for logging)"
+            )
+            return 7
+
+        if reponame_from_args:
+            self._print("Initialise configuration for {}".format(reponame), level=2)
+        else:
+            self._print("Initialise configuration", level=2)
 
         # create config_dir
         new_config = True
@@ -859,6 +865,11 @@ class YARsync():
 
         # create self.REPOFILE
         if not os.path.exists(repofile):
+            if not reponame_from_args:
+                self._print(
+                    "# Repository name '{}' set from host name"\
+                    .format(reponame)
+                )
             self._print("# create configuration file {}".format(repofile))
             with open(repofile, "w") as fil:
                 print(reponame, end="", file=fil)
