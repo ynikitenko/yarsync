@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Test various small yarsync commands
+# Test various small yarsync commands and configuration.
 import os
 
 from yarsync import YARsync

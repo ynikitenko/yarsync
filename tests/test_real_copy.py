@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
-import subprocess
+### Not called, does not actually work ###
 import os
+import subprocess
 import sys
 
-
-TEST_DIR = os.path.join(os.path.dirname(__file__), "test_dir")
+from .settings import TEST_DIR
 
 
 # tmpdir is pytest fixture, https://docs.pytest.org/en/latest/tmpdir.html
 # Hard to say how much that is useful.
-# Push and pull not implemented yet.
 def _test_real_copy(tmpdir):
     # simple push works
     # nothing real yet. By default my yarsync is '-n'.
@@ -58,8 +57,3 @@ def _test_real_copy(tmpdir):
     # pwd = subprocess.call(["pwd"])
     # cd executable is not found, but there is a kwarg cwd
     # cd = subprocess.call(["cd", TEST_DIR])
-
-
-# this is run twice in pytest, but I see no way to prohibit that.
-# Just run python -m pytest <this_file>
-# test_real_copy(tmpdir="../tmp_test_dir")

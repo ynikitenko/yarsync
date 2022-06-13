@@ -90,7 +90,8 @@ def test_init_existent(mocker):
         # otherwise you'll have problems with gettext
         if os.path.commonprefix([filepath, YSDIR]) == YSDIR:
             return True
-        # os.path.exists(filepath) would cause infinite recursion here!
+        # otherwise os.path.exists(filepath)
+        # would cause infinite recursion here
         return False
 
     m = mocker.mock_open()

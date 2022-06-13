@@ -302,7 +302,7 @@ class YARsync():
         )
         parser_status.set_defaults(func=self._status)
 
-        # other useful commands (to be implemented): diff (show difference between commits)
+        # other useful commands (to be implemented):
         # clone? So that 1) can be bidirectional, to and from (unlike for git)
         #                2) know about hardlinks
         #                3) know target name
@@ -311,7 +311,8 @@ class YARsync():
         if len(argv) > 1:  # 0th argument is always present
             args = parser.parse_args(argv[1:])
         else:
-            # default is print help
+            # default is print help.
+            # Will raise SystemExit(0).
             args = parser.parse_args(["--help"])
 
         ########################
@@ -375,7 +376,8 @@ class YARsync():
         # stores last synchronized commit
         self.SYNCFILENAME = os.path.join(self.config_dir, "sync.txt")
 
-        self.DEBUG = True
+        # not used anywhere
+        # self.DEBUG = True
 
         if args.command_name in ['pull', 'push', 'remote']:
         # if args.command_name not in ['checkout', 'diff', 'init', 'log', 'show',
@@ -423,8 +425,6 @@ class YARsync():
 
         self.print_level = 2 - args.quiet
         self._args = args
-
-        # self._parser = parser
 
     def _add_remote(self, remote, path):
         """Add a remote and its path to the config file."""
@@ -498,12 +498,14 @@ class YARsync():
         """Commit the working directory and create a log."""
         # commit directory name is based on UNIX time
         # date = datetime.date.today()
-        # date_str = "{}{:#02}{:#02}".format(date.year, date.month, date.day)
+        # date_str = "{}{:#02}{:#02}"\
+        #            .format(date.year, date.month, date.day)
         # print(date_str)
 
         short_commit_mess = self._args.message
 
-        # platform.node() just calls socket.gethostname() with a check for errors.
+        # platform.node() just calls socket.gethostname()
+        # with an error check
         localhost = socket.gethostname()
         username = getpass.getuser()
         time_str = time.strftime(self.DATEFMT, time.localtime())
@@ -567,13 +569,14 @@ class YARsync():
             stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
         # The data read is buffered in memory,
-        # so do not use this method if the data size is large or unlimited.
+        # so do not use this method
+        # if the data size is large or unlimited.
         # https://docs.python.org/2/library/subprocess.html?highlight=subprocess#subprocess.Popen.communicate
         stdoutdata, stderrdata = completed_process.communicate()
         returncode = completed_process.returncode
         if returncode:
             _print_error("an error occurred during hard linking, "
-                              "rsync returned {}".format(returncode))
+                         "rsync returned {}".format(returncode))
             return returncode
 
         # commit is done
@@ -599,7 +602,7 @@ class YARsync():
         )
 
         try:
-            # merge is done, if it was active
+            # merge is done, if that was active
             os.remove(self.MERGEFILENAME)
         except FileNotFoundError:
             pass

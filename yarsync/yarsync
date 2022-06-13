@@ -16,6 +16,9 @@ if __name__ == "__main__":
         # SystemExit can raise from argparse
         # and it has caused much misunderstanding, e.g.
         # https://stackoverflow.com/questions/42249982/systemexit-2-error-when-calling-parse-args
+        if isinstance(err, SystemExit) and err.code == 0:
+            # normal exit. For example, --help.
+            sys.exit(0)
         sys.exit(7)
     except OSError as err:
         # the error is printed by YARsync
