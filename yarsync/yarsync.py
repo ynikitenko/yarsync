@@ -1380,16 +1380,13 @@ class YARsync():
 
     def _status(self, check_changed=False):
         """Print files and directories that were updated more recently
-        than last commit.
-
-        If no yarsync configuration is found, an error is printed
-        and 7 returned.
+        than the last commit.
 
         Return exit code of `rsync`.
         If *check_changed* is `True`,
         return a tuple *(returncode, changed)*,
-        where *changed* is `True`
-        if the working directory has changes since last commit.
+        where *changed* is `True` if and only if
+        the working directory has changes since last commit.
         """
         # We don't return an error if the directory has changed,
         # because it is a normal situation (not an error).
@@ -1439,6 +1436,7 @@ class YARsync():
 
         self._print(command_str, level=2)
 
+        # default stderr (None) outputs to parent's stderr
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
         # changed means there were actual changes in the working dir
         changed = False
@@ -1450,11 +1448,12 @@ class YARsync():
         for line in lines:
             if line:
                 self._print("Changed since head commit:")
-                # skip permissions
+                # skip permission changes
                 if not line.startswith(b'.'):
-                # if not line.startswith(b'.d..t......'):
-                    # todo: shall we return here if only check_changed?
                     changed = True
+                    if check_changed:
+                        # return code is unimportant in this case
+                        return (0, changed)
 
                 # print the line and all following lines.
                 # todo: use terminal encoding
@@ -1463,6 +1462,8 @@ class YARsync():
                 for line in lines:
                     if not line.startswith(b'.'):
                         changed = True
+                        if check_changed:
+                            return (0, changed)
                     print(line.decode("utf-8"), end='')
 
         sp.wait()  # otherwise returncode might be None
@@ -1503,6 +1504,7 @@ class YARsync():
 
         # called from an internal method
         if check_changed:
+            # changed is always False here
             return (returncode, changed)
         # called as the main command
         return returncode
