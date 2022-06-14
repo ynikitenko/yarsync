@@ -696,14 +696,16 @@ class YARsync():
             return None
         return max(commits)
 
-    def _get_last_sync(self):
+    def _get_last_sync(self, verbose=True):
         try:
             with open(self.SYNCFILENAME) as fil:
                 data = fil.readlines()[0].strip()  # remove trailing newline
                 commit, repo = data.split(sep=",", maxsplit=1)
         except OSError:
             # this is not an error
-            self._print("No syncronization information found.")
+            # verbose is False for automatic usage.
+            if verbose:
+                self._print("No synchronization information found.")
             return (None, None)
         return (int(commit), repo)
 
@@ -788,11 +790,11 @@ class YARsync():
             destpath += '/'
         return (host, destpath)
 
-    def _get_remote_commits(self, commit_dir):
+    def _get_remote_commits(self, commit_dir, print_level=3):
         """Return remote commits as a list of integers."""
         command = ["rsync", "--list-only", commit_dir]
 
-        self._print_command(" ".join(command))
+        self._print_command(" ".join(command), level=print_level)
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
 
         returncode = sp.returncode
@@ -806,6 +808,9 @@ class YARsync():
         for line in iter(sp.stdout.readline, b''):
             comm = line.split()[-1]
             if comm not in [b'.', b'..']:
+                # this works, but we don't test this,
+                # because it should be never needed
+                # (only in case of an error).
                 if not _is_commit(comm):
                     raise OSError(
                         "not a commit found on remote: {}".format(comm)
@@ -994,7 +999,7 @@ class YARsync():
             # otherwise the last element is excluded
             commit_log_list = commit_log_list[:max_count]
 
-        synced_commit, remote = self._get_last_sync()
+        synced_commit, remote = self._get_last_sync(verbose=True)
         head_commit = self._get_head_commit()
 
         def print_logs(commit_log_list):
@@ -1021,8 +1026,8 @@ class YARsync():
 
     def _print_command(self, comm):
         """Print called commands."""
-        # A separate function
-        # to semantically distinguish that from _print in code.
+        # A separate function to semantically distinguish that
+        # from _print in code.
         # However, _print is used internally - to handle output levels.
         self._print(comm)
 
@@ -1082,7 +1087,12 @@ class YARsync():
 
         returncode, changed = self._status(check_changed=True)
         if changed:
-            raise OSError("local repository has uncommitted changes")
+            _print_error(
+                "local repository has uncommitted changes. Exit.\n  "
+                "Run '{} status' for more details.".format(self.NAME)
+            )
+            # or not 8
+            return 8
         if returncode:
             raise OSError("could not check for uncommitted changes, "
                           "rsync returned {}\n".format(returncode) +
@@ -1136,16 +1146,14 @@ class YARsync():
             command.append(root_path)
             command_str += " {} {}".format(full_destpath, root_path)
 
-        # self._print("#", command, debug=True)
-        self._print_command(command_str)
-
         # old local commits (before possible pull)
         local_commits = list(self._get_local_commits())
 
         # if there are no remote commits (a new repository),
         # push will still work
         remote_commits_dir = os.path.join(full_destpath, ".ys", "commits/")
-        remote_commits = self._get_remote_commits(remote_commits_dir)
+        remote_commits = self._get_remote_commits(remote_commits_dir,
+                                                  print_level=3)
 
         if not force:
             # todo: do we need all missing commits?
@@ -1173,6 +1181,8 @@ class YARsync():
                 "2'') --force local state to remote "
                 "(removing all commits and logs missing on the destination)."
             )
+
+        self._print_command(command_str)
 
         completed_process = subprocess.Popen(
             command,
@@ -1362,7 +1372,7 @@ class YARsync():
 
         # commit logs can be None
         commits_with_logs = self._make_commit_list(commits=commits)
-        synced_commit, remote = self._get_last_sync()
+        synced_commit, remote = self._get_last_sync(verbose=True)
 
         for ind, cl in enumerate(commits_with_logs):
             commit, log = cl
@@ -1398,11 +1408,18 @@ class YARsync():
         else:
             commit_subdirs = []
 
+        # decided to leave the condition explicit in code.
+        # def cond_print(*args, **kwargs):
+        #     """A wrapper to ignore check in every place."""
+        #     if check_changed:
+        #         return
+        #     self._print(*args, **kwargs)
+
         ## no commits is fine for an initial commit
         if not commit_subdirs:
-            self._print("No commits found")
             if check_changed:
                 return (0, True)
+            self._print("No commits found")
             return 0
 
         head_commit = self._get_head_commit()
@@ -1434,11 +1451,12 @@ class YARsync():
         command += command_end
         command_str += " " + " ".join(command_end)
 
-        self._print(command_str, level=2)
+        if not check_changed:
+            self._print(command_str, level=3)
 
         # default stderr (None) outputs to parent's stderr
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
-        # this works correct, but strange for pytest:
+        # this works correctly, but strangely for pytest:
         # https://github.com/pytest-dev/pytest-mock/issues/295#issuecomment-1155091491
         # sp = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=sys.stderr)
         # changed means there were actual changes in the working dir
@@ -1450,7 +1468,8 @@ class YARsync():
         lines = iter(sp.stdout.readline, b'')
         for line in lines:
             if line:
-                self._print("Changed since head commit:")
+                if not check_changed:
+                    self._print("Changed since head commit:\n")
                 # skip permission changes
                 if not line.startswith(b'.'):
                     changed = True
@@ -1486,12 +1505,18 @@ class YARsync():
             self._print("Merging {} and {} (most recent common commit {})."\
                         .format(*merges))
 
-        if not changed:
+        if not changed and not check_changed:
             self._print("Nothing to commit, working directory clean.")
+        if changed and not check_changed:
+            # better formatting
+            self._print()
 
-        synced_commit, repo = self._get_last_sync()
+        synced_commit, repo = self._get_last_sync(verbose=not check_changed)
 
-        if synced_commit is not None and repo is not None:
+        if (synced_commit is not None and repo is not None
+            and not check_changed):
+            # if we only check for changes (to push or pull),
+            # we are not interested in the commit synchronization status
             commits = list(self._get_local_commits())
             last_commit = self._get_last_commit(commits)
             if synced_commit == last_commit:

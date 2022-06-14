@@ -30,7 +30,7 @@ def test_log_empty(mocker):
     call = mocker.call
     assert res == 0
     assert mocker_print.mock_calls == [
-        call.write('No syncronization information found.'),
+        call.write('No synchronization information found.'),
         call.write('\n'),
         call.write('No commits found'), call.write('\n')
     ]
@@ -48,7 +48,7 @@ def test_log(mocker):
     call = mocker.call
     assert res == 0
     assert mocker_print.mock_calls == [
-        call.write('No syncronization information found.'),
+        call.write('No synchronization information found.'),
         call.write('\n'),
         call.write('commit 3 is missing'),
         call.write('\n'),
@@ -74,7 +74,7 @@ def test_log(mocker):
     call = mocker.call
     assert res == 0
     assert mocker_print.mock_calls == [
-        call.write('No syncronization information found.'),
+        call.write('No synchronization information found.'),
         call.write('\n'),
         call.write('commit 1'),
         call.write('\n'),

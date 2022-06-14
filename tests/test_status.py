@@ -60,7 +60,7 @@ def test_status_error_bad_permissions(capfd, test_dir_ys_bad_permissions):
     captured = capfd.readouterr()
     assert 'test_dir_ys_bad_permissions/forbidden" failed: Permission denied '\
            in captured.err
-    assert "No syncronization information found." in captured.out
+    assert "No synchronization information found." in captured.out
 
 
 def test_status_no_commits(mocker):
@@ -93,15 +93,16 @@ def test_status_existing_commits(mocker):
     call = mocker.call
     # it is very dubious that we shall test each output line.
     assert mocker_print.mock_calls == [
-        call.write('# '),
-        call.write(''),
-        call.write(
-            "rsync -aun --delete -i --exclude=/.ys {} --outbuf=L {}/ {}/commits/2"\
-            .format(filter_str, ys.root_dir, ys.config_dir)
-        ),
-        call.write('\n'),
+        # this is written only with -v
+        # call.write('# '),
+        # call.write(''),
+        # call.write(
+        #     "rsync -aun --delete -i --exclude=/.ys {} --outbuf=L {}/ {}/commits/2"\
+        #     .format(filter_str, ys.root_dir, ys.config_dir)
+        # ),
+        # call.write('\n'),
         call.write('Nothing to commit, working directory clean.'),
         call.write('\n'),
-        call.write('No syncronization information found.'),
+        call.write('No synchronization information found.'),
         call.write('\n'),
     ]
