@@ -1438,6 +1438,9 @@ class YARsync():
 
         # default stderr (None) outputs to parent's stderr
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
+        # this works correct, but strange for pytest:
+        # https://github.com/pytest-dev/pytest-mock/issues/295#issuecomment-1155091491
+        # sp = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=sys.stderr)
         # changed means there were actual changes in the working dir
         changed = False
         # note that directories may appear to be changed

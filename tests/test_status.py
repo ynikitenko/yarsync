@@ -46,21 +46,21 @@ def test_status_error(mocker, test_dir_read_only):
     # ]
 
 
-def test_status_error_bad_permissions(mocker, test_dir_ys_bad_permissions):
+def test_status_error_bad_permissions(capfd, test_dir_ys_bad_permissions):
     os.chdir(test_dir_ys_bad_permissions)
-    # mocker_stderr.reset_mock()
-    # mocker_stdout = mocker.patch("sys.stdout")
-    mocker_stderr = mocker.patch("sys.stderr")
     ys = YARsync(["yarsync", "status"])
     returncode = ys()
     # rsync returns 23 in case of permission errors
     assert returncode == 23
-    # mocker doesn't capture stderr output from rsync
-    # (because it uses a file descriptor, not sys.stderr)
-    # written_stderr = "".join(call[0][0] for call in
-    #                          mocker_stderr.write.call_args_list)
-    # assert 'test_dir_ys_bad_permissions/forbidden" failed: Permission denied '\
-    #     in written_stderr
+    # mock will not work with non-Python stderr,
+    # https://github.com/pytest-dev/pytest-mock/issues/295#issuecomment-1155105804
+    # so we use capfd
+    # https://docs.pytest.org/en/stable/how-to/capture-stdout-stderr.html#accessing-captured-output-from-a-test-function
+    # https://docs.pytest.org/en/stable/reference/reference.html#capfd
+    captured = capfd.readouterr()
+    assert 'test_dir_ys_bad_permissions/forbidden" failed: Permission denied '\
+           in captured.err
+    assert "No syncronization information found." in captured.out
 
 
 def test_status_no_commits(mocker):
