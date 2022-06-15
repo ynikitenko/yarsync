@@ -120,13 +120,26 @@ and a `list of synchronization and backup programs <https://wiki.archlinux.org/i
 Wikipedia offers a `comparison of file synchronization software <https://en.wikipedia.org/wiki/Comparison_of_file_synchronization_software>`_ and a `comparison of backup software <https://en.wikipedia.org/wiki/Comparison_of_backup_software>`_.
 Git-annex has a list of `git-related <https://git-annex.branchable.com/not/>`_ tools.
 
-------------------
-Development status
-------------------
-``yarsync`` works and is used by its author without errors.
+-------
+Safety
+-------
+``yarsync`` works and is used by its author without major errors.
 It does its main tasks robustly on Linux,
 but at the moment it is not tested on different systems for diverse tasks.
 
 Any data synchronization may lead to data loss,
 so it is recommended to have several data copies
 and always try *--dry-run* (*-n*) first before the actual run.
+
+--------
+License
+--------
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.

@@ -4,8 +4,9 @@ import pytest
 import subprocess
 
 from yarsync import YARsync
-from .settings import (
-    TEST_DIR, TEST_DIR_EMPTY, YSDIR, TEST_DIR_YS_BAD_PERMISSIONS
+from yarsync.yarsync import (
+    CONFIG_ERROR, COMMAND_ERROR,
+    SYS_EXIT_ERROR
 )
 
 
@@ -17,7 +18,7 @@ def test_remote_add(capfd, origin_test_dir, test_dir_ys_bad_permissions):
     # remote "origin" is already added in origin_test_dir.
     # adding remote with same name is forbidden
     returncode = ys()
-    assert returncode == 7
+    assert returncode == COMMAND_ERROR
     captured = capfd.readouterr()
     assert "! remote origin exists, break." in captured.err
     # we disabled stdout in the fixture.

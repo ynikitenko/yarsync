@@ -3,26 +3,43 @@
 import argparse
 import sys
 
-from yarsync import YARsync
+from yarsync import YARsync, YSUnrecognizedArgumentsError
+from yarsync import (
+    SYNTAX_ERROR, CONFIG_ERROR, COMMAND_ERROR,
+    SYS_EXIT_ERROR
+)
 
 
 if __name__ == "__main__":
     # parse arguments
     try:
         ys = YARsync(sys.argv)
-    except (argparse.ArgumentError, argparse.ArgumentTypeError, SystemExit) \
-           as err:
-        # the error is printed by argparse.
-        # SystemExit can raise from argparse
-        # and it has caused much misunderstanding, e.g.
-        # https://stackoverflow.com/questions/42249982/systemexit-2-error-when-calling-parse-args
-        if isinstance(err, SystemExit) and err.code == 0:
-            # normal exit. For example, --help.
-            sys.exit(0)
-        sys.exit(7)
-    except OSError as err:
+    except (argparse.ArgumentError, argparse.ArgumentTypeError,
+            YSUnrecognizedArgumentsError) as err:
+        ## Argparse error ##
+        # rsync returns 1 in case of syntax or usage error,
+        # therefore we use the same code
+        # (rsync is never called during __init__).
+        # the error message is printed by argparse.
+        sys.exit(SYNTAX_ERROR)
+    except OSError:
+        ## ys configuration error ##
+        # (not in a repository, configuration file missing, etc.)
         # the error is printed by YARsync
-        sys.exit(8)
+        sys.exit(CONFIG_ERROR)
+    except SystemExit as err:
+        ## Some runtime error ##
+        # SystemExit can be 130 for python
+        # and 1 for pypy for KeyboardInterrupt.
+        # Since this is interpreter-dependent => unreliable,
+        # we don't capture and return it.
+        # Moreover: we guarantee that our error code does not interfere
+        # with real rsync error codes (during the __init__).
+        if err.code == 0:
+            # normal argparse exit. For example, --help.
+            sys.exit(0)
+        else:
+            sys.exit(SYS_EXIT_ERROR)
 
     # make actual call
     # this should throw no exceptions

@@ -30,8 +30,9 @@ def test_status_error(mocker, test_dir_read_only):
     # [0] is call args, [1] is kwargs
     written_strs = "".join(call[0][0] for call in write_calls)
     # error message is correct
-    assert written_strs == \
+    assert written_strs.startswith(
         "! fatal: no yarsync configuration directory .ys found\n"
+    )
     # no stdout output
     assert mocker_stdout.mock_calls == []
 

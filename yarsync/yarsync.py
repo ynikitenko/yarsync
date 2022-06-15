@@ -1,4 +1,4 @@
-# Yet Another Rsync
+# Yet Another Rsync is a file synchronization tool
 
 import argparse
 import collections
@@ -18,9 +18,37 @@ import sys
 import time
 
 
+########################
+### MODULE CONSTANTS ###
+########################
+## Return codes ##
+# argparse error (raised during YARsync.__init__)
+SYNTAX_ERROR = 1
+# ys configuration error: not in a repository,
+# a config file missing, etc.
+CONFIG_ERROR = 7
+# ys command error: the repository is correct,
+# but in a state forbidding the action
+# (for example, one can't push when there are uncommitted changes
+#  or add a remote with an already present name)
+COMMAND_ERROR = 8
+# Python interpreter could get KeyboardInterrupt
+# or other exceptions leading to sys.exit()
+SYS_EXIT_ERROR = 9
+
+
+# custom exception class
+class YSUnrecognizedArgumentsError(SystemExit):
+
+    def __init__(self, code):
+        SystemExit.__init__(self, code)
+        # super(YSUnrecognizedArgumentsError, self).__init__(code)
+
+
 ######################
 ## Helper functions ##
 ######################
+
 
 def _get_root_directory(config_dir_name):
     """Search for a directory containing *config_dir_name*
@@ -65,20 +93,19 @@ def _print_error(msg):
 
 # copied from https://github.com/DiffSK/configobj/issues/144#issuecomment-347019778
 # with some modifications.
-# Another, and maybe a better option, would be
-# config = ConfigParser(os.environ)
-# config.read('config.ini')
-# where it's probably not necessary to add all the ENV to the config,
-# but only those variables that occur in the config file.
+# Another proposed option is
+# config = ConfigParser(os.environ),
+# which is awful and unsafe,
+# because it adds all the environment to the configuration
 def _substitute_env(content):
-    """Reads filename, substitutes environment variables and returns a file-like
-     object of the result.
+    """Read filename, substitute environment variables and return a file-like
+    object of the result.
 
     Substitution maps text like "$FOO" for the environment variable "FOO".
     """
 
     def lookup(match):
-        """Replaces a match like $FOO with the env var FOO.
+        """Replace a match like $FOO with the env var FOO.
         """
         key = match.group(2)
         if key not in os.environ:
@@ -118,28 +145,34 @@ class YARsync():
         """*argv* is the list of command line arguments."""
 
         parser = argparse.ArgumentParser(
-            description="synchronize directories"
+            description="synchronize directories",
+            # exit_on_error appeared only in Python 3.9
+            # and doesn't seem to work. Skip and be more cross-platform.
+            # exit_on_error=False
         )
+        # failed to implement that with ArgumentError
+        # parser = _ErrorCatchingArgumentParser(...)
         subparsers = parser.add_subparsers(
             title="Available commands",
             dest="command_name",
             # description="valid commands",
             help="type 'yarsync <command> --help' for additional help",
-            # or will print a list of commands in curly braces.
+            # or it will print a list of commands in curly braces.
             metavar="command",
         )
 
         ###################################
         ## Initialize optional arguments ##
         ###################################
-        # or ys_dir
+        # .ys directory
         parser.add_argument("--config-dir", default="",
                             help="path to the configuration directory")
         parser.add_argument("--root-dir", default="",
                             help="path to the root of the working directory")
 
-        parser.add_argument("-D", "--destname",
-                            help="destination name used for logging")
+        # not used
+        # parser.add_argument("-D", "--destname",
+        #                     help="destination name used for logging")
         ## host = target = destination name,
         ## or source name during yarsync init.
         ## -H, because -h corresponds to --help
@@ -217,6 +250,7 @@ class YARsync():
         parser_log.add_argument("-r", "--reverse", action="store_true",
                                 help="reverse the order of the output")
         parser_log.set_defaults(func=self._log)
+        # todo: log <commit_number>
 
         # pull #
         parser_pull = subparsers.add_parser(
@@ -253,10 +287,6 @@ class YARsync():
         # we don't allow pushing new files to remote,
         # because that could cause its inconsistent state
         # (while locally we merge new files manually)
-        # parser_push.add_argument(
-        #     "--new", action="store_true",
-        #     help="don't remove files missing here on the destination"
-        # )
         parser_push.add_argument("destination", nargs="?",
                                  help="destination name or path")
         parser_push.set_defaults(func=self._pull_push)
@@ -292,16 +322,14 @@ class YARsync():
         )
         parser_remote_add.add_argument(
             "repository", help="repository name",
-            # metavar="name"
         )
         parser_remote_add.add_argument(
             "path", help="repository path",
-            # metavar=("name", "path", "options")
         )
-        parser_remote_add.add_argument(
-            "options", nargs='*', help="repository options",
-            # metavar=("name", "path", "options")
-        )
+        # not used yet.
+        # parser_remote_add.add_argument(
+        #     "options", nargs='*', help="repository options",
+        # )
         ## remote rm
         parser_remote_rm = subparsers_remote.add_parser(
             "rm", help="remove remote"
@@ -316,7 +344,6 @@ class YARsync():
         ## remote show, default
         parser_remote_show = subparsers_remote.add_parser(
             "show", help="print remote"
-            # "show", parents=[remote_parent_parser]
         )
         parser_remote_show.set_defaults(func=self._remote_show)
 
@@ -335,13 +362,20 @@ class YARsync():
         parser_status.set_defaults(func=self._status)
 
         # other useful commands (to be implemented):
-        # clone? So that 1) can be bidirectional, to and from (unlike for git)
+        # clone? So that 1) can be bidirectional, to and from
+        #                   (unlike git)
         #                2) know about hardlinks
         #                3) know target name
-        # log <commit_number>
 
         if len(argv) > 1:  # 0th argument is always present
-            args = parser.parse_args(argv[1:])
+            try:
+                args = parser.parse_args(argv[1:])
+            except SystemExit as err:
+                # argparse can raise SystemExit
+                # in case of unrecognized arguments
+                # (apart from ArgumentError and ArgumentTypeError;
+                #  hope this is the complete list)
+                raise YSUnrecognizedArgumentsError(err.code)
         else:
             # default is print help.
             # Will raise SystemExit(0).
@@ -353,8 +387,6 @@ class YARsync():
 
         # basename, because ipython may print full path
         self.NAME = os.path.basename(argv[0])  # "yarsync"
-        # this file contains repository name
-        self.REPOFILENAME = "repository.txt"
         # directory with commits and other metadata
         # (may be updated by command line arguments)
         CONFIGDIRNAME = ".ys"
@@ -373,7 +405,10 @@ class YARsync():
                     # config dir not found.
                     _print_error(
                         "fatal: no {} configuration directory {} found".
-                        format(self.NAME, CONFIGDIRNAME)
+                        format(self.NAME, CONFIGDIRNAME) +
+                        "\n  Check that you are inside an existing repository"
+                        "\n  or initialise a new repository with '{} init'.".
+                        format(self.NAME)
                     )
                     raise err
                 config_dir = os.path.join(root_dir, CONFIGDIRNAME)
@@ -387,26 +422,24 @@ class YARsync():
         self.root_dir = root_dir
         self.config_dir = config_dir
 
-        # directory creation mode can be set from:
+        # directory creation mode could be set from:
         # - command line argument
         # - global configuration
-        # - mode of the sync-ed directory (may be best).
+        # - mode of the sync-ed directory (may be best)
+        # - hardcoded (here).
         self.DIRMODE = 0o755
 
-        # CONFIG = "config.ini"
-        self.CONFIGFILE = os.path.join(self.config_dir, "config.ini")
-        self.HEADFILE = os.path.join(self.config_dir, "HEAD.txt")
         self.COMMITDIR = os.path.join(self.config_dir, "commits")
+        self.CONFIGFILE = os.path.join(self.config_dir, "config.ini")
         self.DATEFMT = "%a, %d %b %Y %H:%M:%S %Z"
+        self.HEADFILE = os.path.join(self.config_dir, "HEAD.txt")
         self.LOGDIR = os.path.join(self.config_dir, "logs")
-        self.MERGEFILENAME = os.path.join(self.config_dir, "MERGE.txt")
-        # REMOTESDIR = os.path.join(self.config_dir, "remotes")
+        self.MERGEFILE = os.path.join(self.config_dir, "MERGE.txt")
+        # contains repository name
+        self.REPOFILE = os.path.join(self.config_dir, "repository.txt")
         self.RSYNCFILTER = os.path.join(self.config_dir, "rsync-filter")
-        # this could be a useful configuration, for example
-        # when mounting a local repo and making a commit.
-        self.REPOFILE = os.path.join(self.config_dir, self.REPOFILENAME)
         # stores last synchronized commit
-        self.SYNCFILENAME = os.path.join(self.config_dir, "sync.txt")
+        self.SYNCFILE = os.path.join(self.config_dir, "sync.txt")
 
         ## Check for CONFIGFILE
         if (args.command_name in ['pull', 'push']
@@ -417,7 +450,7 @@ class YARsync():
         # work fine without config.
             if not os.path.exists(self.CONFIGFILE):
                 _print_error(
-                    "fatal: no {} configuration {} found".
+                    "fatal: no {} configuration {} found.".
                     format(self.NAME, self.CONFIGFILE)
                 )
                 raise OSError(
@@ -499,8 +532,6 @@ class YARsync():
         for line in iter(sp.stdout.readline, b''):
             print(line.decode("utf-8"), end='')
 
-        returncode = sp.returncode
-
         if commit == self._get_last_commit():
             # remove HEADFILE
             self._update_head()
@@ -508,6 +539,8 @@ class YARsync():
             # write HEADFILE
             with open(self.HEADFILE, "w") as head_file:
                 print(commit, file=head_file)
+
+        return sp.returncode
 
     def _commit(self):
         """Commit the working directory and create a log."""
@@ -531,9 +564,9 @@ class YARsync():
         if short_commit_mess:
             short_commit_mess += "\n\n"
 
-        if os.path.exists(self.MERGEFILENAME):
+        if os.path.exists(self.MERGEFILE):
             # copied from _status
-            with open(self.MERGEFILENAME, "r") as fil:
+            with open(self.MERGEFILE, "r") as fil:
                 merge_str = fil.readlines()[0].strip()
             merges = merge_str.split(',')
             short_commit_mess += "Merge {} and {} (common commit {})\n"\
@@ -618,7 +651,7 @@ class YARsync():
 
         try:
             # merge is done, if that was active
-            os.remove(self.MERGEFILENAME)
+            os.remove(self.MERGEFILE)
         except FileNotFoundError:
             pass
 
@@ -675,7 +708,7 @@ class YARsync():
         for line in iter(sp.stdout.readline, b''):
             print(line.decode("utf-8"), end='')
 
-        # returncode = sp.returncode
+        return sp.returncode
 
     def _get_head_commit(self):
         try:
@@ -698,7 +731,7 @@ class YARsync():
 
     def _get_last_sync(self, verbose=True):
         try:
-            with open(self.SYNCFILENAME) as fil:
+            with open(self.SYNCFILE) as fil:
                 data = fil.readlines()[0].strip()  # remove trailing newline
                 commit, repo = data.split(sep=",", maxsplit=1)
         except OSError:
@@ -840,7 +873,9 @@ class YARsync():
             _print_error(
                 "provide a repository name (for logging)"
             )
-            return 7
+            # todo: this (with the larger logic)
+            # should be moved to __init__ .
+            return SYNTAX_ERROR
 
         if reponame_from_args:
             self._print("Initialise configuration for {}".format(reponame), level=2)
@@ -1079,7 +1114,7 @@ class YARsync():
             # that can occur outside the Python system
             raise OSError("local repository has detached HEAD.\n"
                           "*checkout* the most recent commit first.")
-        if os.path.exists(self.MERGEFILENAME):
+        if os.path.exists(self.MERGEFILE):
             raise OSError(
                 "local repository has unmerged changes.\n"
                 "Manually update the working directory and *commit*."
@@ -1091,12 +1126,14 @@ class YARsync():
                 "local repository has uncommitted changes. Exit.\n  "
                 "Run '{} status' for more details.".format(self.NAME)
             )
-            # or not 8
-            return 8
+            return COMMAND_ERROR
         if returncode:
-            raise OSError("could not check for uncommitted changes, "
-                          "rsync returned {}\n".format(returncode) +
-                          "run *status* manually to check the error")
+            _print_error(
+                "could not check for uncommitted changes, "
+                "rsync returned {}. Exit\n  ".format(returncode) +
+                "Run '{} status' for more details.".format(self.NAME)
+            )
+            return COMMAND_ERROR
 
         remote = self._args._remote
 
@@ -1191,9 +1228,9 @@ class YARsync():
         stdoutdata, stderrdata = completed_process.communicate()
         returncode = completed_process.returncode
         if returncode:
-            # todo: error message?
             _print_error(
-                "an error occurred, rsync returned {}".format(returncode)
+                "an error occurred, rsync returned {}. Exit".
+                format(returncode)
             )
             return returncode
 
@@ -1217,18 +1254,18 @@ class YARsync():
                 # todo: check that it is taken into account in other places!
                 if not dry_run:
                     try:
-                        with open(self.MERGEFILENAME, "w") as fil:
+                        with open(self.MERGEFILE, "w") as fil:
                             print(merge_str, end="", file=fil)
                     except OSError:
                         _print_error(
-                            "could not create a merge file {}, "\
-                            .format(self.MERGEFILENAME) +
+                            "could not create a merge file {}, ".
+                            format(self.MERGEFILE) +
                             "create that manually with " + merge_str
                         )
                         raise OSError from None
                 self._print(
                     "merge {} and {} manually and commit "
-                    "(most recent common commit is {})".\
+                    "(most recent common commit is {})".
                     format(max(local_commits), last_remote_comm, common_comm)
                 )
 
@@ -1241,11 +1278,11 @@ class YARsync():
             # synchronization with several remotes?
             sync_str = "{},{}".format(last_commit, remote)
             try:
-                with open(self.SYNCFILENAME, "w") as fil:
+                with open(self.SYNCFILE, "w") as fil:
                     print(sync_str, end="", file=fil)
             except OSError:
                 _print_error("data transferred, but could not log to {}"
-                             .format(self.SYNCFILENAME))
+                             .format(self.SYNCFILE))
 
             # either HEAD was correct ("not detached") (for push)
             # or it was updated (by pull)
@@ -1298,8 +1335,9 @@ class YARsync():
         if self._args.remote_command == "add":
             repository = self._args.repository
             path = self._args.path
-            options = self._args.options
-            return self._remote_add(repository, path, options)
+            # options = self._args.options
+            return self._remote_add(repository, path)
+            # return self._remote_add(repository, path, options)
         elif self._args.remote_command == "rm":
             return self._remote_rm(self._args.repository)
 
@@ -1315,7 +1353,7 @@ class YARsync():
                 "remote {} exists, break.\n  Remove {} "
                 "or choose a new remote name.".format(remote, remote)
             )
-            return 7
+            return COMMAND_ERROR
         config.set(remote, "path", path)
         # todo: options not implemented
         if options:
@@ -1334,7 +1372,7 @@ class YARsync():
             _print_error(
                 "no remote {} found, exit".format(remote)
             )
-            return 7
+            return COMMAND_ERROR
         with open(self.CONFIGFILE, "w") as configfile:
             config.write(configfile)
         self._print("Remote {} removed.".format(remote))
@@ -1498,8 +1536,8 @@ class YARsync():
             self._print("\nDetached HEAD (see '{} log' for more recent commits)"
                         .format(self.NAME))
 
-        if os.path.exists(self.MERGEFILENAME):
-            with open(self.MERGEFILENAME, "r") as fil:
+        if os.path.exists(self.MERGEFILE):
+            with open(self.MERGEFILE, "r") as fil:
                 merge_str = fil.readlines()[0].strip()
             merges = merge_str.split(',')
             self._print("Merging {} and {} (most recent common commit {})."\
@@ -1555,6 +1593,15 @@ class YARsync():
         )
         stdoutdata, stderrdata = completed_process.communicate()
         returncode = completed_process.returncode
+        if returncode:
+            err_msg = (
+                "an error occurred during commit listing, "
+                "rsync returned {}".format(returncode)
+            )
+            _print_error(err_msg)
+            # todo: this should raise a custom exception
+            # with the returned rsync code.
+            raise OSError(err_msg)
         raw_names = stdoutdata.split()
         # commit folder can have files from the user
         # (maybe it should not be allowed: are they transferred at all?..)
@@ -1570,12 +1617,7 @@ class YARsync():
             pass
 
     def __call__(self):
-        """Call the command set during the initialization.
-
-        Return values:
-        8 - not a yarsync directory or an OS error
-        """
-        # 7 is returned in case of bad argparse
+        """Call the command set during the initialisation."""
         try:
             # all errors are usually transferred as returncode
             # and functions throw no exceptions
