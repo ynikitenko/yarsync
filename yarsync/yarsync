@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from yarsync import YARsync, YSUnrecognizedArgumentsError
+from yarsync import YARsync, YSArgumentError, YSUnrecognizedArgumentsError
 from yarsync import (
     SYNTAX_ERROR, CONFIG_ERROR, COMMAND_ERROR,
     SYS_EXIT_ERROR
@@ -15,7 +15,7 @@ if __name__ == "__main__":
     try:
         ys = YARsync(sys.argv)
     except (argparse.ArgumentError, argparse.ArgumentTypeError,
-            YSUnrecognizedArgumentsError) as err:
+            YSArgumentError, YSUnrecognizedArgumentsError) as err:
         ## Argparse error ##
         # rsync returns 1 in case of syntax or usage error,
         # therefore we use the same code

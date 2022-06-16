@@ -10,5 +10,10 @@ TEST_DIR_READ_ONLY = os.path.join(os.path.dirname(__file__),
 # directory with a .ys repository, but with a forbidden subdirectory
 TEST_DIR_YS_BAD_PERMISSIONS = os.path.join(os.path.dirname(__file__),
                                            "test_dir_ys_bad_permissions")
+# content must be same as in TEST_DIR, but the YSDIR is detached.
+TEST_DIR_CONFIG_DIR = os.path.join(os.path.dirname(__file__),
+                                   "test_dir_config_dir")
+TEST_DIR_WORK_DIR = os.path.join(os.path.dirname(__file__),
+                                 "test_dir_work_dir")
 
 YSDIR = ".ys"

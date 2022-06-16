@@ -11,7 +11,6 @@ import json
 import os
 import re
 # for host name
-# import platform
 import socket
 import subprocess
 import sys
@@ -21,6 +20,7 @@ import time
 ########################
 ### MODULE CONSTANTS ###
 ########################
+
 ## Return codes ##
 # argparse error (raised during YARsync.__init__)
 SYNTAX_ERROR = 1
@@ -37,12 +37,28 @@ COMMAND_ERROR = 8
 SYS_EXIT_ERROR = 9
 
 
-# custom exception class
-class YSUnrecognizedArgumentsError(SystemExit):
+## Custom exception classes ##
+class YSError(Exception):
+    """Base for all yarsync exceptions."""
+
+    pass
+
+
+class YSUnrecognizedArgumentsError(YSError, SystemExit):
 
     def __init__(self, code):
+        # actually the code is never used later
         SystemExit.__init__(self, code)
         # super(YSUnrecognizedArgumentsError, self).__init__(code)
+
+
+class YSArgumentError(YSError):
+    # don't know how to initialize an argparse.ArgumentError,
+    # so create a custom exception
+
+    def __init__(self, arg="", msg=""):
+        self.arg = arg
+        self.msg = msg
 
 
 ######################
@@ -87,12 +103,11 @@ def _is_commit(file_name):
 def _print_error(msg):
     # not a class method, because it can be run
     # when YARsync was not fully initialised yet.
-    # Will not work in Python 2 (if I ever use that here).
     print("!", msg, file=sys.stderr)
 
 
-# copied from https://github.com/DiffSK/configobj/issues/144#issuecomment-347019778
-# with some modifications.
+# copied with some modifications from
+# https://github.com/DiffSK/configobj/issues/144#issuecomment-347019778
 # Another proposed option is
 # config = ConfigParser(os.environ),
 # which is awful and unsafe,
@@ -175,8 +190,8 @@ class YARsync():
         #                     help="destination name used for logging")
         ## host = target = destination name,
         ## or source name during yarsync init.
-        ## -H, because -h corresponds to --help
-        # the algorithm is different depending on
+        ## -H, because -h corresponds to --help.
+        # The algorithm is different depending on
         # whether it's a remote or a local repository.
 
         parser.add_argument(
@@ -412,13 +427,26 @@ class YARsync():
                     )
                     raise err
                 config_dir = os.path.join(root_dir, CONFIGDIRNAME)
+        elif config_dir:
+            if not root_dir:
+                # If we are right in the root dir,
+                # this argument should not be required.
+                # But it is error prone if we move to a subdirectory
+                # and call checkout (because root-dir will be wrong).
+                # If the user wants safety,
+                # they can provide the root-dir themselves
+                # together with config-dir
+                # (we say about an alias for 'yarsync --config-dir=...')
+                root_dir = "."
         else:
-            # at least one of them is provided.
-            # check that they are both provided
-            if not root_dir or not config_dir:
-                parser.error(
-                    "both --config-dir and --root-dir must be provided"
-                )
+            err_msg = "yarsync: error: --root-dir requires --config-dir "\
+                      "to be provided"
+            # we don't _print_error here,
+            # because we want to mimic an argparse error.
+            print(err_msg)
+            # could not initialize ArgumentError here,
+            # so created a new one
+            raise YSArgumentError("root-dir", err_msg)
         self.root_dir = root_dir
         self.config_dir = config_dir
 
