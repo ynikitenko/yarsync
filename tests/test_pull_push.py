@@ -32,4 +32,6 @@ def test_pull_push_uncommitted(
     assert returncode == 8
     captured = capfd.readouterr()
     assert "local repository has uncommitted changes" in captured.err
-    assert not captured.out
+    assert "Changed since head commit:\n" in captured.out
+    # we allow printing changes.
+    # assert not captured.out

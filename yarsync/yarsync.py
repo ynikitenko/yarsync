@@ -730,8 +730,6 @@ class YARsync():
         if verbose:
             print_command(*command)
 
-        # todo: what about stderr?
-        # todo: verbose/quiet flags
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
         for line in iter(sp.stdout.readline, b''):
             print(line.decode("utf-8"), end='')
@@ -795,7 +793,8 @@ class YARsync():
             include_commands = ["--include={}".format(inc) for inc in includes]
             # since we don't have spaces in the command,
             # single ticks are not necessary
-            include_command_str = " ".join(["--include={}".format(inc) for inc in includes])
+            include_command_str = " ".join(["--include={}".format(inc)
+                                            for inc in includes])
             filter_ += include_commands
             if filter_str:
                 # otherwise an empty string will be joined by a space
@@ -1087,12 +1086,12 @@ class YARsync():
             print("# ", end='')
         print(*args, **kwargs)
 
-    def _print_command(self, comm):
+    def _print_command(self, *args, **kwargs):
         """Print called commands."""
         # A separate function to semantically distinguish that
         # from _print in code.
         # However, _print is used internally - to handle output levels.
-        self._print(comm)
+        self._print(*args, **kwargs)
 
     def _print_log(self, commit, log, synced_commit=None, remote=None,
                    head_commit=None):
@@ -1534,14 +1533,14 @@ class YARsync():
         lines = iter(sp.stdout.readline, b'')
         for line in lines:
             if line:
-                if not check_changed:
-                    self._print("Changed since head commit:\n")
+                # if not check_changed:
+                self._print("Changed since head commit:\n")
                 # skip permission changes
                 if not line.startswith(b'.'):
                     changed = True
-                    if check_changed:
-                        # return code is unimportant in this case
-                        return (0, changed)
+                    # if check_changed:
+                    #     # return code is unimportant in this case
+                    #    return (0, changed)
 
                 # print the line and all following lines.
                 # todo: use terminal encoding
@@ -1550,8 +1549,8 @@ class YARsync():
                 for line in lines:
                     if not line.startswith(b'.'):
                         changed = True
-                        if check_changed:
-                            return (0, changed)
+                        # if check_changed:
+                        #     return (0, changed)
                     print(line.decode("utf-8"), end='')
 
         sp.wait()  # otherwise returncode might be None
@@ -1573,7 +1572,7 @@ class YARsync():
 
         if not changed and not check_changed:
             self._print("Nothing to commit, working directory clean.")
-        if changed and not check_changed:
+        if changed:  # and not check_changed:
             # better formatting
             self._print()
 
