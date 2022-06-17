@@ -85,6 +85,12 @@ CONFIG_EXAMPLE = """\
 # # several sections are allowed
 # [my_drive]
 # path = $MY_DRIVE/my_repo
+# # inline comments are not allowed
+# # don't write this!
+# # host =   # empty host means localhost
+# # this is correct:
+# # empty host means localhost
+# host = 
 #
 # Variables in paths are allowed.
 # For them to take the effect, run
@@ -503,29 +509,42 @@ class YARsync():
         self.SYNCFILE = os.path.join(self.config_dir, "sync.txt")
 
         ## Check for CONFIGFILE
-        if (args.command_name in ['pull', 'push']
-            or (args.command_name == "remote"
-                and args.remote_command != "add")
-        ):
-        # 'checkout', 'diff', 'init', 'log', 'show', 'status'
+        # "checkout", "diff", "init", "log", "show", "status"
         # work fine without config.
-            if not os.path.exists(self.CONFIGFILE):
-                _print_error(
-                    "fatal: no {} configuration {} found.".
-                    format(self.NAME, self.CONFIGFILE)
-                )
-                raise OSError(
-                    "{} not found".format(self.CONFIGFILE)
-                )
+        if args.command_name in ["pull", "push", "remote"]:
             try:
-                self._read_config()
+                with open(self.CONFIGFILE, "r") as conf_file:
+                    config_text = conf_file.read()
+            except OSError as err:
+                if (args.command_name == "remote"
+                    and args.remote_command == "add"
+                    and not os.path.exists(self.CONFIGFILE)):
+                    config_text = ""
+                else:
+                    # we are in an existing repository,
+                    # because .ys exists.
+                    _print_error(
+                        "fatal: could not read {} configuration at {}.".
+                        format(self.NAME, self.CONFIGFILE) +
+                        "\n  Check your permissions or restore missing files "
+                        "with '{} init'".
+                        format(self.NAME)
+                    )
+                    raise err
+            try:
+                config, configdict = self._read_config(config_text)
             except configparser.Error as err:
+                err_descr = type(err).__name__ + ":\n    " + str(err)
                 _print_error(
-                    "{} configuration error:".format(self.NAME) +
-                    str(err)
+                    "{} configuration error in {}:\n  ".
+                    format(self.NAME, self.CONFIGFILE) +
+                    err_descr
                 )
-                raise YSConfigurationError(err, str(err))
-            # now there are self._config and self._configdict
+                raise YSConfigurationError(err, err_descr)
+            self._configdict = configdict
+            if args.command_name == "remote":
+                # config is not needed for any other command
+                self._config = config
 
         ####################################
         ## Initialize optional parameters ##
@@ -862,33 +881,33 @@ class YARsync():
         If destination path is missing, `KeyError` is raised.
         """
         config = self._configdict
-        if not dest:
-            try:
-                dest = config["default"]["name"]
-            except KeyError:
-                raise KeyError(
-                    'no default destination found in config. '
-                    'Add subsection "default" with name=<default subsection>'
-                )
-            # This doesn't give the first section, helas.
-            # defaultsect = list(configdict.items())[0]
-            # dest = defaultsect[0]
-
+        # if dest:
         try:
-            destpath = config[dest]["path"]
+            dest_section = config[dest]
         except KeyError:
-            raise KeyError("destination path must be present "
-                           "in the configuration") from None
-        try:
-            host = config[dest]["host"]
-        except KeyError:
-            # localhost
-            host = ""
+            raise KeyError(
+                "no destination '{}' found in the configuration {}. ".
+                format(dest, self.CONFIGFILE)
+            )
+        # todo:
+        # else:
+        #     # find a section with a key "upstream".
+        #     # It could be also "upstream-push" or "upstream-pull",
+        #     # but this looks too remote for now.
+        #     try:
+        #         dest = config["default"]["name"]
+        #     except KeyError:
+        #         raise KeyError(
+        #             'no default destination found in config. '
+        #         )
 
-        # destpath = "{}:{}".format(dest, configdict[remote]["path"])
+        # destpath must be present (checked during _read_config).
+        destpath = dest_section["destpath"]
+
         if not destpath.endswith('/'):
             destpath += '/'
-        return (host, destpath)
+
+        return destpath
 
     def _get_remote_commits(self, commit_dir, print_level=3):
         """Return remote commits as a list of integers."""
@@ -1217,10 +1236,9 @@ class YARsync():
         remote = self._args._remote
 
         try:
-            host, destpath = self._get_dest_path(remote)
+            full_destpath = self._get_dest_path(remote)
         except KeyError as err:
             raise err from None
-        full_destpath = _mkhostpath(host, destpath)
 
         # --link-dest is not needed, since if a file is new,
         # it won't be in remote commits.
@@ -1369,43 +1387,60 @@ class YARsync():
 
         return 0
 
-    def _read_config(self):
+    def _read_config(self, config_text):
 
         # substitute environmental variables (those that are available)
         # todo: what if an envvar is not present for the current section?
-        with open(self.CONFIGFILE, "r") as conf_file:
-            subst_lines = _substitute_env(conf_file.read()).getvalue()
+        subst_lines = _substitute_env(config_text).getvalue()
 
-        config = configparser.ConfigParser()
+        # no value is allowed
+        # for a configuration key "host_from_section_name"
+        config = configparser.ConfigParser(allow_no_value=True)
         # ConfigParser.read_string
         # is undocumented in Python2, but present!
         config.read_string(subst_lines)
 
+        # configdict is config with some evaluations,
+        # like full paths.
         configdict = {}
         for section in config.sections():
             sectiond = dict(config[section])
             configdict[section] = sectiond
-            if section == "default":
+            if section == config.default_section:
                 continue
 
             try:
-                # all local repositories must have an entry "host"
-                # (can be empty or localhost, or equivalent)
                 host = sectiond["host"]
             except KeyError:
-                # sections for remotes can be named after their hosts
-                host = ""  # section
-            destpath = sectiond["path"]
-            sectiond["destpath"] = _mkhostpath(host, destpath)
+                if "host_from_section_name" in config[config.default_section]:
+                    # sections for remotes are named after their hosts
+                    host = section
+                else:
+                    host = ""
+            try:
+                path = sectiond["path"]
+            except KeyError as err:
+                err_descr = "a required key 'path' is missing. "\
+                    "Provide the path to the remote '{}'.".\
+                    format(section)
+                _print_error(
+                    "{} configuration error in {}:\n  ".
+                    format(self.NAME, self.CONFIGFILE) +
+                    err_descr
+                )
+                raise YSConfigurationError(err, err_descr)
+
+            # If host is empty, then this is a local host
+            # or it is already present in the path.
+            # If host is non-empty, that can't be present in the path.
+            sectiond["destpath"] = _mkhostpath(host, path)
 
         # print all values:
-        # configdict = self._configdict
         # formatter = lambda s: json.dumps(s, sort_keys=True, indent=4)
         # print(formatter(configdict))
 
         # config.items() includes the DEFAULT section, which can't be removed.
-        self._config = config
-        self._configdict = configdict
+        return (config, configdict)
 
     def _remote(self):
         """Manage remotes."""
@@ -1423,8 +1458,7 @@ class YARsync():
     def _remote_add(self, remote, path, options=""):
         """Add a remote and its path to the config file."""
         # from https://docs.python.org/2.7/library/configparser.html#examples
-        config = configparser.RawConfigParser()
-        config.read(self.CONFIGFILE)
+        config = self._config
         try:
             config.add_section(remote)
         except configparser.DuplicateSectionError:

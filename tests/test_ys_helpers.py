@@ -11,6 +11,7 @@ from .settings import TEST_DIR
 
 
 def test_config(tmp_path):
+    # Test real configuration file
     # example configuration is written during the initialisation
     os.chdir(tmp_path)
     ys = YARsync(["yarsync", "init"])
@@ -21,10 +22,10 @@ def test_config(tmp_path):
 
     # wrong configuration raises
     wrong_config = """\
-    [repo1]
+    [remote1]
     path = /
     # duplicate sections are forbidden
-    [repo1]
+    [remote1]
     path = /
     """
     with open(config_filename, "w") as config:
@@ -32,8 +33,63 @@ def test_config(tmp_path):
     # config is used only by pull, push and remote add.
     # So it should be rather remotes.ini
     # But we don't have any other config then.
-    with pytest.raises(YSConfigurationError):
-        YARsync(["yarsync", "pull", "-n", "repo1"])
+    with pytest.raises(YSConfigurationError) as err:
+        YARsync(["yarsync", "pull", "-n", "remote1"])
+    # err is not a YSConfigurationError, but a pytest.ExceptionInfo,
+    # that is why we take err.value
+    assert "DuplicateSectionError" in err.value.msg
+    assert "[line  4]: section 'remote1' already exists" in err.value.msg
+
+
+def test_read_config():
+    os.chdir(TEST_DIR)
+    # we need to initialise one object to test its method
+    ys = YARsync(["yarsync", "status"])
+    # actual configuration is ignored here
+
+    config_with_default = """\
+    [DEFAULT]
+    host_from_section_name
+
+    [myremote]
+    path = /
+
+    [mylocal]
+    # localhost
+    host = 
+    path = /
+    """
+    config, config_dict = ys._read_config(config_with_default)
+    # path is unchanged. Changes are in the destpath.
+    assert config_dict["myremote"]["path"] == "/"
+    assert config_dict["myremote"]["destpath"] == "myremote:/"
+    # section host overwrites the default host.
+    assert config_dict["mylocal"]["destpath"] == "/"
+
+    config_without_default = """\
+    [myremote]
+    path = /
+
+    [mylocal]
+    # localhost
+    host = 
+    path = /
+
+    [myremote1]
+    host = myremote1
+    path = /
+
+    [myremote2]
+    path = myremote2:/
+    """
+    config, config_dict = ys._read_config(config_without_default)
+    # oops, remote is considered a local path now...
+    assert config_dict["myremote"]["destpath"] == "/"
+    assert config_dict["mylocal"]["destpath"] == "/"
+    # but we can provide a correct host:
+    assert config_dict["myremote1"]["destpath"] == "myremote1:/"
+    # or a correct path:
+    assert config_dict["myremote2"]["destpath"] == "myremote2:/"
 
 
 def test_env_vars():
