@@ -44,14 +44,14 @@ class YSError(Exception):
     pass
 
 
-class YSUnrecognizedArgumentsError(YSError, SystemExit):
+class YSConfigurationError(YSError):
 
-    def __init__(self, code):
-        # actually the code is never used later
-        SystemExit.__init__(self, code)
-        # super(YSUnrecognizedArgumentsError, self).__init__(code)
+    def __init__(self, arg="", msg=""):
+        self.arg = arg
+        self.msg = msg
 
 
+## command line arguments errors
 class YSArgumentError(YSError):
     # don't know how to initialize an argparse.ArgumentError,
     # so create a custom exception
@@ -60,6 +60,39 @@ class YSArgumentError(YSError):
         self.arg = arg
         self.msg = msg
 
+
+class YSUnrecognizedArgumentsError(YSError, SystemExit):
+
+    def __init__(self, code):
+        # actually the code is never used later
+        SystemExit.__init__(self, code)
+        # super(YSUnrecognizedArgumentsError, self).__init__(code)
+
+
+## Example configuration ##
+CONFIG_EXAMPLE = """\
+# uncomment and edit sections or use
+# $ yarsync remote add <remote> <path>
+# to add a remote.
+#
+# [remote]
+# # comments are allowed
+# path = remote:/path/on/remote/to/my_repo
+# # spaces around '=' are allowed
+# # spaces in section names are not allowed
+# # (will be treated as part of the name)
+#
+# # several sections are allowed
+# [my_drive]
+# path = $MY_DRIVE/my_repo
+#
+# Variables in paths are allowed.
+# For them to take the effect, run
+# $ export MY_DRIVE=/run/media/my_drive
+# $ yarsync push -n my_drive
+# Always try --dry-run first to ensure
+# that all paths still exist and are correct!
+"""
 
 ######################
 ## Helper functions ##
@@ -484,7 +517,14 @@ class YARsync():
                 raise OSError(
                     "{} not found".format(self.CONFIGFILE)
                 )
-            self._read_config()
+            try:
+                self._read_config()
+            except configparser.Error as err:
+                _print_error(
+                    "{} configuration error:".format(self.NAME) +
+                    str(err)
+                )
+                raise YSConfigurationError(err, str(err))
             # now there are self._config and self._configdict
 
         ####################################
@@ -887,9 +927,6 @@ class YARsync():
         If a configuration file already exists, it is not changed.
         This operation is safe and idempotent (can be repeated safely).
         """
-        ysdir = self.config_dir
-        repofile = self.REPOFILE
-
         # reponame will be written to repofile and used in logs.
         reponame = self._args.reponame
         reponame_from_args = True
@@ -897,12 +934,17 @@ class YARsync():
             reponame = socket.gethostname()
             reponame_from_args = False
         if not reponame:
-            _print_error(
-                "provide a repository name (for logging)"
+            pass
+            self._print(
+                "To improve logging, provide a repository name "
+                "in {}".format(self.REPOFILE)
             )
-            # todo: this (with the larger logic)
-            # should be moved to __init__ .
-            return SYNTAX_ERROR
+            # _print_error(
+            #     "provide a repository name (for logging)"
+            # )
+            # # todo: this (with the larger logic)
+            # # should be moved to __init__ .
+            # return SYNTAX_ERROR
 
         if reponame_from_args:
             self._print("Initialise configuration for {}".format(reponame), level=2)
@@ -910,11 +952,14 @@ class YARsync():
             self._print("Initialise configuration", level=2)
 
         # create config_dir
-        new_config = True
+        ysdir = self.config_dir
         if not os.path.exists(ysdir):
             self._print_command("mkdir -m {:o} {}".format(self.DIRMODE, ysdir))
             # can raise "! [Errno 13] Permission denied: '.ys'"
             os.mkdir(ysdir, self.DIRMODE)
+            # if every configuration file existed,
+            # new_config will be False
+            new_config = True
         else:
             self._print("{} already exists, skip".format(ysdir), level=2)
             new_config = False
@@ -924,23 +969,30 @@ class YARsync():
         if not os.path.exists(self.CONFIGFILE):
             self._print("# create configuration file {}".format(self.CONFIGFILE))
             with open(self.CONFIGFILE, "w") as fil:
-                print("", end="", file=fil)
+                print(CONFIG_EXAMPLE, end="", file=fil)
             new_config = True
         else:
             self._print("{} already exists, skip".format(self.CONFIGFILE),
                         level=2)
 
-        # create self.REPOFILE
+        # create repofile
+        repofile = self.REPOFILE
         if not os.path.exists(repofile):
-            if not reponame_from_args:
+            if not reponame:
+                self._print(
+                    "# To improve logging, provide a repository name "
+                    "as an argument to 'init'\n# or in {}".format(repofile)
+                )
+            elif not reponame_from_args:
                 self._print(
                     "# Repository name '{}' set from host name"\
                     .format(reponame)
                 )
-            self._print("# create configuration file {}".format(repofile))
-            with open(repofile, "w") as fil:
-                print(reponame, end="", file=fil)
-            new_config = True
+            if reponame:
+                self._print("# create configuration file {}".format(repofile))
+                with open(repofile, "w") as fil:
+                    print(reponame, end="", file=fil)
+                new_config = True
         else:
             self._print("{} already exists, skip".format(repofile), level=2)
 

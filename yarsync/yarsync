@@ -3,7 +3,10 @@
 import argparse
 import sys
 
-from yarsync import YARsync, YSArgumentError, YSUnrecognizedArgumentsError
+from yarsync import YARsync
+from yarsync import (
+    YSArgumentError, YSUnrecognizedArgumentsError, YSConfigurationError
+)
 from yarsync import (
     SYNTAX_ERROR, CONFIG_ERROR, COMMAND_ERROR,
     SYS_EXIT_ERROR
@@ -22,7 +25,7 @@ if __name__ == "__main__":
         # (rsync is never called during __init__).
         # the error message is printed by argparse.
         sys.exit(SYNTAX_ERROR)
-    except OSError:
+    except (OSError, YSConfigurationError):
         ## ys configuration error ##
         # (not in a repository, configuration file missing, etc.)
         # the error is printed by YARsync

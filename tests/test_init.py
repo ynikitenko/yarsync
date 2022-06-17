@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 from yarsync import YARsync
+from yarsync.yarsync import CONFIG_EXAMPLE
 
 from .settings import YSDIR
 
@@ -40,7 +41,7 @@ def test_init_mixed(mocker):
     call = mocker.call
     assert m.mock_calls == [
         call(conffile, "w"), call().__enter__(),
-        call().write(''), call().write(''),
+        call().write(CONFIG_EXAMPLE), call().write(''),
         call().__exit__(None, None, None),
         call(repofile, "w"), call().__enter__(),
         call().write("myhost"),
@@ -75,7 +76,7 @@ def test_init_non_existent(mocker):
     assert m.mock_calls == [
         # mkdir is recorded separately
         call(conffile, "w"), call().__enter__(),
-        call().write(''), call().write(''),
+        call().write(CONFIG_EXAMPLE), call().write(''),
         call().__exit__(None, None, None),
         call(repofile, "w"), call().__enter__(),
         call().write("myhost"),

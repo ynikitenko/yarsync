@@ -1,12 +1,39 @@
-# -*- coding: utf-8 -*-
-# Test various small yarsync commands and configuration.
+"""Test various small yarsync commands and configuration."""
 import os
 
+import pytest
+
 from yarsync import YARsync
-from yarsync.yarsync import _is_commit
-from yarsync.yarsync import _substitute_env
+from yarsync.yarsync import _is_commit, _substitute_env
+from yarsync.yarsync import CONFIG_EXAMPLE, YSConfigurationError
 
 from .settings import TEST_DIR
+
+
+def test_config(tmp_path):
+    # example configuration is written during the initialisation
+    os.chdir(tmp_path)
+    ys = YARsync(["yarsync", "init"])
+    ys()
+    config_filename = ys.CONFIGFILE
+    with open(config_filename) as config:
+        assert config.read() == CONFIG_EXAMPLE
+
+    # wrong configuration raises
+    wrong_config = """\
+    [repo1]
+    path = /
+    # duplicate sections are forbidden
+    [repo1]
+    path = /
+    """
+    with open(config_filename, "w") as config:
+        config.write(wrong_config)
+    # config is used only by pull, push and remote add.
+    # So it should be rather remotes.ini
+    # But we don't have any other config then.
+    with pytest.raises(YSConfigurationError):
+        YARsync(["yarsync", "pull", "-n", "repo1"])
 
 
 def test_env_vars():
@@ -34,7 +61,7 @@ def test_is_commit():
 
 
 def test_print(mocker):
-    # ys must be initialized with some settings.
+    # ys must be initialised with some settings.
     os.chdir(TEST_DIR)
 
     mocker_print = mocker.patch("sys.stdout")
