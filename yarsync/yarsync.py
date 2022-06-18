@@ -144,6 +144,10 @@ def _clone(repository, directory="", origin="origin"):
     if any(os.scandir(directory)):
         _print_error("directory {} non-empty. Abort.".format(directory))
         raise YSCommandError()
+        # it is recommended to close the scandir iterator
+        # https://docs.python.org/3/library/os.html#os.scandir,
+        # but if we return right here, it is not needed
+        # (I don't receive a warning here).
 
     try:
         # no need to remember the path
@@ -152,7 +156,8 @@ def _clone(repository, directory="", origin="origin"):
         os.chdir(directory)
         # todo: what about verbosity?
         # Probably make _print a separate function for that?
-        ys = YARsync(["yarsync", "-q", "init"])
+        ys = YARsync(["yarsync", "-qq", "init"])
+        print("Initialized a new repository in {}".format(directory))
         returncode = ys()
         if returncode:
             raise YSCommandError(returncode)
@@ -160,6 +165,7 @@ def _clone(repository, directory="", origin="origin"):
             # in order to clean up the created new repository.
 
         ys._remote_add(origin, repository)
+        print("Added a remote '{}' with path {}".format(origin, repository))
         # raise YSCommandError(1)
     except YSCommandError as err:
         # we import shutil lazily here,
@@ -184,8 +190,9 @@ def _clone(repository, directory="", origin="origin"):
 
     # todo: can we make pull or push accepting arguments?
     # Or should we fix self._args to reuse the existing object?
-    ys_pull = YARsync(["yarsync", "pull", origin])
+    ys_pull = YARsync(["yarsync", "-qq", "pull", origin])
     ys_pull()
+    print("\n{} cloned.".format(origin))
     # os.chdir(old_path)
 
 
@@ -362,10 +369,10 @@ class YARsync():
             help="use <name> of the remote repository instead of 'origin'",
             metavar="<name>"
         )
-        parser_clone.add_argument("repository", help="repository path")
+        parser_clone.add_argument("repository", help="source repository path")
         parser_clone.add_argument(
             "directory", nargs="?", default="",
-            help="the name of a new directory to clone into"
+            help="directory with the new cloned repository"
         )
         # called manually with arguments
         # parser_clone.set_defaults(func=_clone)
@@ -607,8 +614,9 @@ class YARsync():
         # - command line argument
         # - global configuration
         # - mode of the sync-ed directory (may be best)
-        # - hardcoded (here).
-        self.DIRMODE = 0o755
+        # - hardcoded
+        # - just skipped (and will be set correctly by the OS).
+        # self.DIRMODE = 0o755
 
         self.COMMITDIR = os.path.join(self.config_dir, "commits")
         self.CONFIGFILE = os.path.join(self.config_dir, "config.ini")
@@ -778,7 +786,7 @@ class YARsync():
         short_commit_mess += log_str
 
         if not os.path.exists(self.COMMITDIR):
-            os.mkdir(self.COMMITDIR, self.DIRMODE)
+            os.mkdir(self.COMMITDIR)
 
         commit_name = str(int(time.time()))
         commit_dir = os.path.join(self.COMMITDIR, commit_name)
@@ -837,7 +845,7 @@ class YARsync():
         ## log ##
         if not os.path.exists(self.LOGDIR):
             self._print_command("mkdir {}".format(self.LOGDIR))
-            os.mkdir(self.LOGDIR, self.DIRMODE)
+            os.mkdir(self.LOGDIR)
 
         commit_log_name = os.path.join(self.LOGDIR, commit_name + ".txt")
 
@@ -1123,9 +1131,11 @@ class YARsync():
         # create config_dir
         ysdir = self.config_dir
         if not os.path.exists(ysdir):
-            self._print_command("mkdir -m {:o} {}".format(self.DIRMODE, ysdir))
+            self._print_command("mkdir {}".format(ysdir))
+            # self._print_command("mkdir -m {:o} {}".
+            #                     format(self.DIRMODE, ysdir))
             # can raise "! [Errno 13] Permission denied: '.ys'"
-            os.mkdir(ysdir, self.DIRMODE)
+            os.mkdir(ysdir)
             # if every configuration file existed,
             # new_config will be False
             new_config = True

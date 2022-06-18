@@ -72,7 +72,8 @@ def test_init_non_existent(mocker):
     res = ys()
     assert res == 0
     call = mocker.call
-    assert mkdir.mock_calls == [call(YSDIR, ys.DIRMODE)]
+    assert mkdir.mock_calls == [call(YSDIR)]
+    # assert mkdir.mock_calls == [call(YSDIR, ys.DIRMODE)]
     assert m.mock_calls == [
         # mkdir is recorded separately
         call(conffile, "w"), call().__enter__(),

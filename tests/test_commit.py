@@ -61,8 +61,8 @@ def test_commit(mocker):
 
     assert res == 0
     assert mkdir.mock_calls == [
-        call(ys.COMMITDIR, ys.DIRMODE),
-        call(ys.LOGDIR, ys.DIRMODE),
+        call(ys.COMMITDIR),
+        call(ys.LOGDIR),
     ]
     assert rename.mock_calls == [
         call(commit_dir_tmp, commit_dir),

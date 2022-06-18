@@ -5,9 +5,44 @@ import pytest
 
 from yarsync import YARsync
 from yarsync.yarsync import _is_commit, _substitute_env
-from yarsync.yarsync import CONFIG_EXAMPLE, YSConfigurationError
+from yarsync.yarsync import (
+    CONFIG_EXAMPLE, YSConfigurationError, YSCommandError
+)
 
 from .settings import TEST_DIR
+
+
+def test_clone(tmpdir):
+    clone_command = ["yarsync", "clone", "-o", "test_dir_repo",
+                     TEST_DIR, tmpdir.__str__()]
+    with pytest.raises(SystemExit) as err:
+        YARsync(clone_command)
+        # normal exit with code 0
+        assert not err.code
+
+    # all files were transferred
+    # we compare sets, because the ordering would be different
+    assert set(os.listdir(tmpdir)) == set(os.listdir(TEST_DIR))
+
+    # clone to a non-empty directory is forbidden
+    with pytest.raises(YSCommandError):
+        YARsync(clone_command)
+
+    ## however, we can clone into its subdirectory!
+    clone_command[-1] += '/'
+    with pytest.raises(SystemExit) as err:
+        YARsync(clone_command)
+        assert not err.code
+    test_dir_name = os.path.split(TEST_DIR)[1]
+    assert test_dir_name in os.listdir(tmpdir)
+    # all configuration was set correctly
+    os.chdir(os.path.join(tmpdir, test_dir_name))
+    ys = YARsync(["yarsync", "remote", "show"])
+    assert ys._configdict == {
+        'test_dir_repo':
+            {'destpath': TEST_DIR,
+             'path': TEST_DIR}
+    }
 
 
 def test_config(tmp_path):
