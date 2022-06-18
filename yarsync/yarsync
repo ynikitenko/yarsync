@@ -5,7 +5,8 @@ import sys
 
 from yarsync import YARsync
 from yarsync import (
-    YSArgumentError, YSUnrecognizedArgumentsError, YSConfigurationError
+    YSArgumentError, YSUnrecognizedArgumentsError,
+    YSConfigurationError, YSCommandError
 )
 from yarsync import (
     SYNTAX_ERROR, CONFIG_ERROR, COMMAND_ERROR,
@@ -43,6 +44,8 @@ if __name__ == "__main__":
             sys.exit(0)
         else:
             sys.exit(SYS_EXIT_ERROR)
+    except YSCommandError:
+        sys.exit(COMMAND_ERROR)
 
     # make actual call
     # this should throw no exceptions

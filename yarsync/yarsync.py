@@ -51,6 +51,14 @@ class YSConfigurationError(YSError):
         self.msg = msg
 
 
+class YSCommandError(YSError):
+    """Can be raised if a yarsync command was not successful."""
+
+    def __init__(self, code=0):
+        # code might be unimportant, therefore we allow 0
+        self.code = code
+
+
 ## command line arguments errors
 class YSArgumentError(YSError):
     # don't know how to initialize an argparse.ArgumentError,
@@ -105,6 +113,82 @@ CONFIG_EXAMPLE = """\
 ######################
 
 
+def _clone(repository, directory="", origin="origin"):
+    if repository.endswith('/'):
+        # ignore trailing slash
+        repository = repository[:-1]
+
+    if directory == "" or directory.endswith('/'):
+        ## get directory name from the repository path
+
+        # os.path.split(path) returns a (head, tail) pair.
+        # It is important that the path does not end in '/',
+        # or tail will be empty!
+        repo_name = os.path.split(repository)[1]
+        directory = os.path.join(directory, repo_name)
+
+    if ':' not in repository or os.path.exists(repository):
+        ## For a local path, make it absolute.
+        # Otherwise it will not work when we enter the *directory*.
+        # rsync accepts paths like [USER@]HOST:SRC
+        # todo: this will fail on Windows with C:\...
+        # '~' in the path will be handled by shell.
+        repository = os.path.abspath(repository)
+
+    try:
+        os.makedirs(directory, exist_ok=True)
+    except OSError as err:
+        _print_error("could not create a directory {}. Abort.".format(directory))
+        raise YSCommandError()
+
+    if any(os.scandir(directory)):
+        _print_error("directory {} non-empty. Abort.".format(directory))
+        raise YSCommandError()
+
+    try:
+        # no need to remember the path
+        # (it won't be changed for the user).
+        # old_path = os.getcwd()
+        os.chdir(directory)
+        # todo: what about verbosity?
+        # Probably make _print a separate function for that?
+        ys = YARsync(["yarsync", "-q", "init"])
+        returncode = ys()
+        if returncode:
+            raise YSCommandError(returncode)
+            # We don't exit here but raise,
+            # in order to clean up the created new repository.
+
+        ys._remote_add(origin, repository)
+        # raise YSCommandError(1)
+    except YSCommandError as err:
+        # we import shutil lazily here,
+        # because it is not used in other places
+        # and because this use case is marginal (not likely).
+        import shutil
+        # don't remove the base 'directory',
+        # because it could be created before us.
+        # It is safer to remove only .ys .
+        # Since ys is initialized without any config-dir options,
+        # this should be safe.
+        ysdir = ys.config_dir
+        # this is wrong for ysdir, since we already entered the directory
+        ysdir_full_path = os.path.join(directory, ys.config_dir)
+        # Cleaning up the directory allows to repeat the clone command
+        # without errors.
+        print("Cleaning up. Removing '{}'...".format(ysdir_full_path))
+        shutil.rmtree(ysdir)
+        print("Done.")
+        # print("Removed {}.".format(ysdir))
+        raise err
+
+    # todo: can we make pull or push accepting arguments?
+    # Or should we fix self._args to reuse the existing object?
+    ys_pull = YARsync(["yarsync", "pull", origin])
+    ys_pull()
+    # os.chdir(old_path)
+
+
 def _get_root_directory(config_dir_name):
     """Search for a directory containing *config_dir_name*
     higher in the file system hierarchy.
@@ -141,7 +225,7 @@ def _is_commit(file_name):
 
 def _print_error(msg):
     # not a class method, because it can be run
-    # when YARsync was not fully initialised yet.
+    # when YARsync was not fully initialized yet.
     print("!", msg, file=sys.stderr)
 
 
@@ -268,6 +352,24 @@ class YARsync():
         parser_checkout.add_argument("commit", help="commit name")
         parser_checkout.set_defaults(func=self._checkout)
 
+        # clone #
+        parser_clone = subparsers.add_parser(
+            "clone",
+            help="clone a repository into a new directory"
+        )
+        parser_clone.add_argument(
+            "-o", "--origin", nargs="?", default="origin",
+            help="use <name> of the remote repository instead of 'origin'",
+            metavar="<name>"
+        )
+        parser_clone.add_argument("repository", help="repository path")
+        parser_clone.add_argument(
+            "directory", nargs="?", default="",
+            help="the name of a new directory to clone into"
+        )
+        # called manually with arguments
+        # parser_clone.set_defaults(func=_clone)
+
         # commit #
         parser_commit = subparsers.add_parser(
             "commit", help="commit the working directory"
@@ -287,9 +389,9 @@ class YARsync():
 
         # init #
         parser_init = subparsers.add_parser("init",
-                                            help="initialise a repository")
+                                            help="initialize a repository")
         parser_init.add_argument("reponame", nargs="?",
-                                 help="name of the local initialised repository")
+                                 help="name of the local initialized repository")
         parser_init.set_defaults(func=self._init)
 
         # log #
@@ -429,11 +531,23 @@ class YARsync():
                 # in case of unrecognized arguments
                 # (apart from ArgumentError and ArgumentTypeError;
                 #  hope this is the complete list)
+                if err.code == 0:
+                    raise err
                 raise YSUnrecognizedArgumentsError(err.code)
         else:
             # default is print help.
             # Will raise SystemExit(0).
             args = parser.parse_args(["--help"])
+
+        if args.command_name == "clone":
+            returncode = _clone(
+                repository=args.repository, directory=args.directory,
+                origin=args.origin
+            )
+            # if there was en error, it will be raised already.
+            # We don't return an error code here, because we have
+            # a separate SYS_EXIT_ERROR for SystemExit.
+            sys.exit(0)
 
         ########################
         ## Init configuration ##
@@ -461,7 +575,7 @@ class YARsync():
                         "fatal: no {} configuration directory {} found".
                         format(self.NAME, CONFIGDIRNAME) +
                         "\n  Check that you are inside an existing repository"
-                        "\n  or initialise a new repository with '{} init'.".
+                        "\n  or initialize a new repository with '{} init'.".
                         format(self.NAME)
                     )
                     raise err
@@ -542,9 +656,11 @@ class YARsync():
                 )
                 raise YSConfigurationError(err, err_descr)
             self._configdict = configdict
-            if args.command_name == "remote":
-                # config is not needed for any other command
-                self._config = config
+            # Don't economize on memory here, but enhance our object
+            # (better to store than to re-read).
+            # if args.command_name == "remote":
+            #     # config is not needed for any other command
+            self._config = config
 
         ####################################
         ## Initialize optional parameters ##
@@ -795,6 +911,76 @@ class YARsync():
 
         return sp.returncode
 
+    def _get_dest_path(self, dest=None):
+        """Return a pair *(host, destpath)*, where
+        *host* is a real host (its ip/name/etc.) at the destination
+        and *destpath* is a path on that host.
+
+        If *host* is not present in the configuration,
+        it is set to localhost.
+        If destination path is missing, `KeyError` is raised.
+        """
+        config = self._configdict
+        # if dest:
+        try:
+            dest_section = config[dest]
+        except KeyError:
+            raise KeyError(
+                "no destination '{}' found in the configuration {}. ".
+                format(dest, self.CONFIGFILE)
+            )
+        # todo:
+        # else:
+        #     # find a section with a key "upstream".
+        #     # It could be also "upstream-push" or "upstream-pull",
+        #     # but this looks too remote for now.
+        #     try:
+        #         dest = config["default"]["name"]
+        #     except KeyError:
+        #         raise KeyError(
+        #             'no default destination found in config. '
+        #         )
+
+        # destpath must be present (checked during _read_config).
+        destpath = dest_section["destpath"]
+
+        if not destpath.endswith('/'):
+            destpath += '/'
+
+        return destpath
+
+    def _get_filter(self, include_commits=True):
+        # todo: .ys, commits and logs should not be fixed here.
+        if os.path.exists(self.RSYNCFILTER):
+            filter_ = ["--filter=merge {}".format(self.RSYNCFILTER)]
+            filter_str = "--filter='merge {}'".format(self.RSYNCFILTER)
+        else:
+            filter_ = []
+            filter_str = ""
+        if include_commits:
+            includes = ["/.ys/commits", "/.ys/logs"]
+            include_commands = ["--include={}".format(inc) for inc in includes]
+            # since we don't have spaces in the command,
+            # single ticks are not necessary
+            include_command_str = " ".join(["--include={}".format(inc)
+                                            for inc in includes])
+            filter_ += include_commands
+            if filter_str:
+                # otherwise an empty string will be joined by a space
+                filter_str = " ".join([filter_str, include_command_str])
+            else:
+                filter_str = include_command_str
+        # exclude can go before or after include,
+        # because the first matching rule is applied.
+        # It's important to place /* after .ys,
+        # because it means files exactly one level below .ys
+        filter_ += ["--exclude=/.ys/*"]
+        if filter_str:
+            filter_str += " "
+        filter_str += "--exclude=/.ys/*"
+        # print("filter_str: '{}'".format(filter_str))
+        return (filter_, filter_str)
+
     def _get_head_commit(self):
         try:
             with open(self.HEADFILE, "r") as head:
@@ -839,75 +1025,39 @@ class YARsync():
             commit_candidates = []
         return map(int, filter(_is_commit, commit_candidates))
 
-    def _get_filter(self, include_commits=True):
-        # todo: .ys, commits and logs should not be fixed here.
-        if os.path.exists(self.RSYNCFILTER):
-            filter_ = ["--filter=merge {}".format(self.RSYNCFILTER)]
-            filter_str = "--filter='merge {}'".format(self.RSYNCFILTER)
-        else:
-            filter_ = []
-            filter_str = ""
-        if include_commits:
-            includes = ["/.ys/commits", "/.ys/logs"]
-            include_commands = ["--include={}".format(inc) for inc in includes]
-            # since we don't have spaces in the command,
-            # single ticks are not necessary
-            include_command_str = " ".join(["--include={}".format(inc)
-                                            for inc in includes])
-            filter_ += include_commands
-            if filter_str:
-                # otherwise an empty string will be joined by a space
-                filter_str = " ".join([filter_str, include_command_str])
-            else:
-                filter_str = include_command_str
-        # exclude can go before or after include,
-        # because the first matching rule is applied.
-        # It's important to place /* after .ys,
-        # because it means files exactly one level below .ys
-        filter_ += ["--exclude=/.ys/*"]
-        if filter_str:
-            filter_str += " "
-        filter_str += "--exclude=/.ys/*"
-        # print("filter_str: '{}'".format(filter_str))
-        return (filter_, filter_str)
-
-    def _get_dest_path(self, dest=None):
-        """Return a pair *(host, destpath)*, where
-        *host* is a real host (its ip/name/etc.) at the destination
-        and *destpath* is a path on that host.
-
-        If *host* is not present in the configuration,
-        it is set to localhost.
-        If destination path is missing, `KeyError` is raised.
+    def _get_missing_commits(self, from_path, to_path):
+        """Return a list of commits (directories) present on *from_path*
+        and missing on *to_path*.
         """
-        config = self._configdict
-        # if dest:
-        try:
-            dest_section = config[dest]
-        except KeyError:
-            raise KeyError(
-                "no destination '{}' found in the configuration {}. ".
-                format(dest, self.CONFIGFILE)
+        # "-r" means recursive
+        # "-r --exclude='/*/*'" means
+        # to list a single directory without recursion.
+        # If a pattern ends with a '/',
+        # then it will only match a directory
+        command = "rsync -nr --info=NAME --include=/ --exclude=/*/*".split() \
+                  + [from_path, to_path]
+        # self._print(" ".join(command), debug=True)
+        completed_process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        stdoutdata, stderrdata = completed_process.communicate()
+        returncode = completed_process.returncode
+        if returncode:
+            err_msg = (
+                "an error occurred during commit listing, "
+                "rsync returned {}".format(returncode)
             )
-        # todo:
-        # else:
-        #     # find a section with a key "upstream".
-        #     # It could be also "upstream-push" or "upstream-pull",
-        #     # but this looks too remote for now.
-        #     try:
-        #         dest = config["default"]["name"]
-        #     except KeyError:
-        #         raise KeyError(
-        #             'no default destination found in config. '
-        #         )
-
-        # destpath must be present (checked during _read_config).
-        destpath = dest_section["destpath"]
-
-        if not destpath.endswith('/'):
-            destpath += '/'
-
-        return destpath
+            _print_error(err_msg)
+            # todo: this should raise a custom exception
+            # with the returned rsync code.
+            raise OSError(err_msg)
+        raw_names = stdoutdata.split()
+        # commit folder can have files from the user
+        # (maybe it should not be allowed: are they transferred at all?..)
+        dirs = (os.path.dirname(str(dir_, 'utf-8')) for dir_ in raw_names)
+        missing_commits = [int(os.path.basename(dir_)) for dir_ in dirs if dir_]
+        return missing_commits
 
     def _get_remote_commits(self, commit_dir, print_level=3):
         """Return remote commits as a list of integers."""
@@ -966,9 +1116,9 @@ class YARsync():
             # return SYNTAX_ERROR
 
         if reponame_from_args:
-            self._print("Initialise configuration for {}".format(reponame), level=2)
+            self._print("Initialize configuration for {}".format(reponame), level=2)
         else:
-            self._print("Initialise configuration", level=2)
+            self._print("Initialize configuration", level=2)
 
         # create config_dir
         ysdir = self.config_dir
@@ -1017,10 +1167,10 @@ class YARsync():
 
         ysdir_fp = os.path.realpath(ysdir)
         if new_config:
-            self._print("\nInitialised yarsync configuration in {} "
+            self._print("\nInitialized yarsync configuration in {} "
                         .format(ysdir_fp))
         else:
-            self._print("\nConfiguration in {} already initialised."
+            self._print("\nConfiguration in {} already initialized."
                         .format(ysdir_fp))
 
         return 0
@@ -1290,16 +1440,23 @@ class YARsync():
                                                   print_level=3)
 
         if not force:
-            # todo: do we need all missing commits?
-            # We should look at only the most recent commits.
+            # We require all commits, not only most recent ones.
+            # We probably don't check for existence of local commits
+            # if we want to push (that would raise an error).
             if self._args.command_name == "push":
-                missing_commits = self._test_missing_commits(
+                missing_commits = self._get_missing_commits(
                     remote_commits_dir, self.COMMITDIR + '/'
                 )
-            else:
-                missing_commits = self._test_missing_commits(
+            elif os.path.exists(self.COMMITDIR):
+                missing_commits = self._get_missing_commits(
                     self.COMMITDIR + '/', remote_commits_dir
                 )
+            else:
+                # missing_commits are those that can be overwritten
+                # by push or pull.
+                # For pull and empty COMMITDIR there are no missing commits.
+                missing_commits = []
+                # missing_commits = self._get_remote_commits(remote_commits_dir)
 
         if not (force or new) and missing_commits:
             missing_commits_str = ", ".join(map(str, missing_commits))
@@ -1458,7 +1615,16 @@ class YARsync():
     def _remote_add(self, remote, path, options=""):
         """Add a remote and its path to the config file."""
         # from https://docs.python.org/2.7/library/configparser.html#examples
+        if not hasattr(self, "_config"):
+            # config might be missing if we first call 'init'
+            # and then '_remote_add' (as in 'clone').
+            # In that case it is not necessary to check for all errors.
+            with open(self.CONFIGFILE, "r") as conf_file:
+                config_text = conf_file.read()
+                self._config, self._configdict = self._read_config(config_text)
+
         config = self._config
+
         try:
             config.add_section(remote)
         except configparser.DuplicateSectionError:
@@ -1569,7 +1735,12 @@ class YARsync():
         ## no commits is fine for an initial commit
         if not commit_subdirs:
             if check_changed:
-                return (0, True)
+                for subdir in os.scandir(self.root_dir):
+                    if subdir.path != self.config_dir or subdir.is_file():
+                        return (0, True)
+                # if there is only '.ys' in the working directory,
+                # then the repository is unchanged.
+                return (0, False)
             self._print("No commits found")
             return 0
 
@@ -1687,40 +1858,6 @@ class YARsync():
             return (returncode, changed)
         # called as the main command
         return returncode
-
-    def _test_missing_commits(self, from_path, to_path):
-        """Return a list of commits (directories) present on *from_path*
-        and missing on *to_path*.
-        """
-        # "-r" means recursive
-        # "-r --exclude='/*/*'" means
-        # to list a single directory without recursion.
-        # If a pattern ends with a '/',
-        # then it will only match a directory
-        command = "rsync -nr --info=NAME --include=/ --exclude=/*/*".split() \
-                  + [from_path, to_path]
-        # self._print(" ".join(command), debug=True)
-        completed_process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        stdoutdata, stderrdata = completed_process.communicate()
-        returncode = completed_process.returncode
-        if returncode:
-            err_msg = (
-                "an error occurred during commit listing, "
-                "rsync returned {}".format(returncode)
-            )
-            _print_error(err_msg)
-            # todo: this should raise a custom exception
-            # with the returned rsync code.
-            raise OSError(err_msg)
-        raw_names = stdoutdata.split()
-        # commit folder can have files from the user
-        # (maybe it should not be allowed: are they transferred at all?..)
-        dirs = (os.path.dirname(str(dir_, 'utf-8')) for dir_ in raw_names)
-        missing_commits = [int(os.path.basename(dir_)) for dir_ in dirs if dir_]
-        return missing_commits
 
     def _update_head(self):
         try:
