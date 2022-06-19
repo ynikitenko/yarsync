@@ -252,10 +252,15 @@ class YARsync():
         # (but not init or log or status? Or maybe give a hint what's going on?)
         # Oh no, -n with log is number of commits.
 
-        parser.add_argument("-q", "--quiet",
-                            action="count",
-                            default=0,
-                            help="decrease verbosity")
+        verbose_group = parser.add_mutually_exclusive_group()
+        verbose_group.add_argument("-q", "--quiet",
+                                   action="count",
+                                   default=0,
+                                   help="decrease verbosity")
+        verbose_group.add_argument("-v", "--verbose",
+                                   action="count",
+                                   default=0,
+                                   help="increase verbosity")
 
         ############################
         ## Initialize subcommands ##
@@ -612,7 +617,7 @@ class YARsync():
         elif args.command_name == "push":
             args._remote = args.destination
 
-        self.print_level = 2 - args.quiet
+        self.print_level = 2 - args.quiet + args.verbose
 
         self._args = args
 
@@ -687,10 +692,12 @@ class YARsync():
             ys.print_level = self.print_level - 2
             returncode = ys()
 
-            init_str = "Initialized a new repository"
-            if name is not None:
-                init_str += " " + name
-            self._print(init_str, "in {}".format(directory))
+            if self.print_level <= 2:
+                # otherwise it will be printed by subcommands
+                init_str = "Initialized a new repository"
+                if name is not None:
+                    init_str += " " + name
+                self._print(init_str, "in {}".format(directory))
 
             if returncode:
                 raise YSCommandError(returncode)
@@ -698,8 +705,9 @@ class YARsync():
                 # in order to clean up the created new repository.
 
             ys._remote_add(origin, repository)
-            self._print("Added a remote '{}' with path {}".
-                        format(origin, repository))
+            if self.print_level <= 2:
+                self._print("Added a remote '{}' with path {}".
+                            format(origin, repository))
             # raise YSCommandError(1)
         except YSCommandError as err:
             # we import shutil lazily here,
@@ -729,8 +737,9 @@ class YARsync():
         # Or should we fix self._args to reuse the existing object?
         ys_pull = YARsync(["yarsync", "pull", origin])
         ys_pull.print_level = self.print_level - 2
-        ys_pull()
+        returncode = ys_pull()
         self._print("\n{} cloned.".format(origin))
+        return returncode
 
     def _checkout(self, commit=None):
         """Checkout a commit.
@@ -1074,7 +1083,7 @@ class YARsync():
             # no commits exist
             # todo: do we print about that here?
             commit_candidates = []
-        return map(int, filter(_is_commit, commit_candidates))
+        return list(map(int, filter(_is_commit, commit_candidates)))
 
     def _get_missing_commits(self, from_path, to_path):
         """Return a list of commits (directories) present on *from_path*
@@ -1117,10 +1126,11 @@ class YARsync():
         self._print_command(" ".join(command), level=print_level)
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
 
+        sp.wait()
         returncode = sp.returncode
         if returncode:
             raise OSError(
-                "error during listing of remote commits: rsync returned {}"\
+                "error during listing remote commits: rsync returned {}"\
                 .format(returncode)
             )
 
