@@ -4,6 +4,7 @@ import argparse
 import collections
 import configparser
 import datetime
+import functools
 # for user name
 import getpass
 import io
@@ -410,7 +411,6 @@ class YARsync():
                                             help="initialize a repository")
         parser_init.add_argument("reponame", nargs="?",
                                  help="name of the local initialized repository")
-        parser_init.set_defaults(func=self._init)
 
         # log #
         parser_log = subparsers.add_parser(
@@ -693,6 +693,12 @@ class YARsync():
         # for a subparser, https://stackoverflow.com/a/46964652/952234
         if args.command_name == "remote" and args.remote_command is None:
             self._func = self._remote_show
+        elif args.command_name == "init":
+            # https://stackoverflow.com/a/41070441/952234
+            self._func = functools.partial(self._init, args.reponame)
+            # this also works, but lambdas can't be pickled
+            # (even though we don't need that)
+            # self._func = lambda: self._init(self._args.reponame)
         else:
             self._func = args.func
 
@@ -1112,17 +1118,17 @@ class YARsync():
 
         return commits
 
-    def _init(self):
+    def _init(self, reponame):
         """Initialize default configuration.
 
         Create configuration folder, configuration and repository files.
 
         If a configuration file already exists, it is not changed.
         This operation is safe and idempotent (can be repeated safely).
-        """
-        # reponame will be written to repofile and used in logs.
-        reponame = self._args.reponame
 
+        *reponame* will be written to self.REPOFILE
+        and used during commits.
+        """
         init_repo_str = "Initialize configuration"
         if reponame:
             init_repo_str += " for '{}'".format(reponame)
