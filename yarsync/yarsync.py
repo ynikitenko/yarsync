@@ -661,7 +661,8 @@ class YARsync():
         try:
             os.makedirs(directory, exist_ok=True)
         except OSError as err:
-            _print_error("could not create a directory {}. Abort.".format(directory))
+            _print_error("could not create a directory {}. Abort."
+                         .format(directory))
             raise YSCommandError()
 
         if any(os.scandir(directory)):
@@ -679,15 +680,18 @@ class YARsync():
             os.chdir(directory)
             # todo: what about verbosity?
             # Probably make _print a separate function for that?
-            command = ["yarsync", "-qq", "init"]
+            command = ["yarsync", "init"]
             if name is not None:
                 command.append(name)
             ys = YARsync(command)
+            ys.print_level = self.print_level - 2
+            returncode = ys()
+
             init_str = "Initialized a new repository"
             if name is not None:
                 init_str += " " + name
             self._print(init_str, "in {}".format(directory))
-            returncode = ys()
+
             if returncode:
                 raise YSCommandError(returncode)
                 # We don't exit here but raise,
@@ -714,6 +718,8 @@ class YARsync():
             # without errors.
             self._print("Cleaning up. Removing '{}'...".
                         format(ysdir_full_path))
+            # one could only remove the .ys dir and the few config files
+            # explicitly.
             shutil.rmtree(ysdir)
             self._print("Done.")
             # print("Removed {}.".format(ysdir))
@@ -721,7 +727,8 @@ class YARsync():
 
         # todo: can we make pull or push accepting arguments?
         # Or should we fix self._args to reuse the existing object?
-        ys_pull = YARsync(["yarsync", "-qq", "pull", origin])
+        ys_pull = YARsync(["yarsync", "pull", origin])
+        ys_pull.print_level = self.print_level - 2
         ys_pull()
         self._print("\n{} cloned.".format(origin))
 
