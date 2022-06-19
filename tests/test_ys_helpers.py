@@ -22,24 +22,24 @@ from .settings import TEST_DIR
 )
 def test_clone(tmpdir, clone_command):
     clone_command.extend([TEST_DIR, tmpdir.__str__()])
-    with pytest.raises(SystemExit) as err:
-        YARsync(clone_command)
-        # normal exit with code 0
-        assert not err.code
+    ys = YARsync(clone_command)
+    returncode = ys()
+    assert not returncode
 
     # all files were transferred
     # we compare sets, because the ordering would be different
     assert set(os.listdir(tmpdir)) == set(os.listdir(TEST_DIR))
 
     # clone to a non-empty directory is forbidden
+    ys_err = YARsync(clone_command)
     with pytest.raises(YSCommandError):
-        YARsync(clone_command)
+        ys_err()
 
     ## however, we can clone into its subdirectory!
     clone_command[-1] += '/'
-    with pytest.raises(SystemExit) as err:
-        YARsync(clone_command)
-        assert not err.code
+    ys_subd = YARsync(clone_command)
+    assert not ys_subd()
+
     test_dir_name = os.path.split(TEST_DIR)[1]
     assert test_dir_name in os.listdir(tmpdir)
     # all configuration was set correctly

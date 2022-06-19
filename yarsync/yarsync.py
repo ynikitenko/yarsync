@@ -114,95 +114,6 @@ CONFIG_EXAMPLE = """\
 ######################
 
 
-def _clone(repository, directory="", origin="origin", name=None):
-    if repository.endswith('/'):
-        # ignore trailing slash
-        repository = repository[:-1]
-
-    if directory == "" or directory.endswith('/'):
-        ## get directory name from the repository path
-
-        # os.path.split(path) returns a (head, tail) pair.
-        # It is important that the path does not end in '/',
-        # or tail will be empty!
-        repo_name = os.path.split(repository)[1]
-        directory = os.path.join(directory, repo_name)
-
-    if ':' not in repository or os.path.exists(repository):
-        ## For a local path, make it absolute.
-        # Otherwise it will not work when we enter the *directory*.
-        # rsync accepts paths like [USER@]HOST:SRC
-        # todo: this will fail on Windows with C:\...
-        # '~' in the path will be handled by shell.
-        repository = os.path.abspath(repository)
-
-    try:
-        os.makedirs(directory, exist_ok=True)
-    except OSError as err:
-        _print_error("could not create a directory {}. Abort.".format(directory))
-        raise YSCommandError()
-
-    if any(os.scandir(directory)):
-        _print_error("directory {} non-empty. Abort.".format(directory))
-        raise YSCommandError()
-        # it is recommended to close the scandir iterator
-        # https://docs.python.org/3/library/os.html#os.scandir,
-        # but if we return right here, it is not needed
-        # (I don't receive a warning here).
-
-    try:
-        # no need to remember the path
-        # (it won't be changed for the user).
-        # old_path = os.getcwd()
-        os.chdir(directory)
-        # todo: what about verbosity?
-        # Probably make _print a separate function for that?
-        command = ["yarsync", "-qq", "init"]
-        if name is not None:
-            command.append(name)
-        ys = YARsync(command)
-        init_str = "Initialized a new repository"
-        if name is not None:
-            init_str += " " + name
-        print(init_str, "in {}".format(directory))
-        returncode = ys()
-        if returncode:
-            raise YSCommandError(returncode)
-            # We don't exit here but raise,
-            # in order to clean up the created new repository.
-
-        ys._remote_add(origin, repository)
-        print("Added a remote '{}' with path {}".format(origin, repository))
-        # raise YSCommandError(1)
-    except YSCommandError as err:
-        # we import shutil lazily here,
-        # because it is not used in other places
-        # and because this use case is marginal (not likely).
-        import shutil
-        # don't remove the base 'directory',
-        # because it could be created before us.
-        # It is safer to remove only .ys .
-        # Since ys is initialized without any config-dir options,
-        # this should be safe.
-        ysdir = ys.config_dir
-        # this is wrong for ysdir, since we already entered the directory
-        ysdir_full_path = os.path.join(directory, ys.config_dir)
-        # Cleaning up the directory allows to repeat the clone command
-        # without errors.
-        print("Cleaning up. Removing '{}'...".format(ysdir_full_path))
-        shutil.rmtree(ysdir)
-        print("Done.")
-        # print("Removed {}.".format(ysdir))
-        raise err
-
-    # todo: can we make pull or push accepting arguments?
-    # Or should we fix self._args to reuse the existing object?
-    ys_pull = YARsync(["yarsync", "-qq", "pull", origin])
-    ys_pull()
-    print("\n{} cloned.".format(origin))
-    # os.chdir(old_path)
-
-
 def _get_root_directory(config_dir_name):
     """Search for a directory containing *config_dir_name*
     higher in the file system hierarchy.
@@ -386,8 +297,6 @@ class YARsync():
             "directory", nargs="?", default="",
             help="directory with the new cloned repository"
         )
-        # called manually with arguments
-        # parser_clone.set_defaults(func=_clone)
 
         # commit #
         parser_commit = subparsers.add_parser(
@@ -557,16 +466,6 @@ class YARsync():
             # Will raise SystemExit(0).
             args = parser.parse_args(["--help"])
 
-        if args.command_name == "clone":
-            returncode = _clone(
-                repository=args.repository, directory=args.directory,
-                origin=args.origin, name=args.name
-            )
-            # if there was en error, it will be raised already.
-            # We don't return an error code here, because we have
-            # a separate SYS_EXIT_ERROR for SystemExit.
-            sys.exit(0)
-
         ########################
         ## Init configuration ##
         ########################
@@ -583,7 +482,7 @@ class YARsync():
             if args.command_name == "init":
                 root_dir = "."
                 config_dir = CONFIGDIRNAME
-            else:
+            elif args.command_name != "clone":
                 # search the current directory and its parents
                 try:
                     root_dir = _get_root_directory(CONFIGDIRNAME)
@@ -699,6 +598,12 @@ class YARsync():
             # this also works, but lambdas can't be pickled
             # (even though we don't need that)
             # self._func = lambda: self._init(self._args.reponame)
+        elif args.command_name == "clone":
+            self._func = functools.partial(
+                self._clone,
+                repository=args.repository, directory=args.directory,
+                origin=args.origin, name=args.name
+            )
         else:
             self._func = args.func
 
@@ -710,6 +615,115 @@ class YARsync():
         self.print_level = 2 - args.quiet
 
         self._args = args
+
+    def _clone(self, repository, directory="", origin="origin", name=None):
+        """Clone a yarsync *repository* to a *directory*.
+
+        The new repository will have the name *name* in self.REPOFILE.
+        The original repository will be added as a remote
+        with the name *origin* to the new one.
+
+        Note that only data (working directory, commits and logs,
+        and not any of yarsync configuration files!) will be cloned.
+
+        If the *directory* path ends with a slash,
+        a new repository will be created as its subdirectory
+        with the name taken from the last path element of the
+        source *repository*.
+        Otherwise, the new repository will be the *directory* itself.
+
+        If the path *directory* (or any its parent directories)
+        do not exist, they will be created. If the resulting
+        directory exists and is non-empty, it will be preserved
+        and an error issued.
+        """
+        if repository.endswith('/'):
+            # ignore trailing slash
+            repository = repository[:-1]
+
+        if directory == "" or directory.endswith('/'):
+            ## get directory name from the repository path
+
+            # os.path.split(path) returns a (head, tail) pair.
+            # It is important that the path does not end in '/',
+            # or tail will be empty!
+            repo_name = os.path.split(repository)[1]
+            directory = os.path.join(directory, repo_name)
+
+        if ':' not in repository or os.path.exists(repository):
+            ## For a local path, make it absolute.
+            # Otherwise it will not work when we enter the *directory*.
+            # rsync accepts paths like [USER@]HOST:SRC
+            # todo: this will fail on Windows with C:\...
+            # '~' in the path will be handled by shell.
+            repository = os.path.abspath(repository)
+
+        try:
+            os.makedirs(directory, exist_ok=True)
+        except OSError as err:
+            _print_error("could not create a directory {}. Abort.".format(directory))
+            raise YSCommandError()
+
+        if any(os.scandir(directory)):
+            _print_error("directory {} non-empty. Abort.".format(directory))
+            raise YSCommandError()
+            # it is recommended to close the scandir iterator
+            # https://docs.python.org/3/library/os.html#os.scandir,
+            # but if we return right here, it is not needed
+            # (I don't receive a warning here).
+
+        try:
+            # no need to remember the path
+            # (it won't be changed for the user).
+            # old_path = os.getcwd()
+            os.chdir(directory)
+            # todo: what about verbosity?
+            # Probably make _print a separate function for that?
+            command = ["yarsync", "-qq", "init"]
+            if name is not None:
+                command.append(name)
+            ys = YARsync(command)
+            init_str = "Initialized a new repository"
+            if name is not None:
+                init_str += " " + name
+            self._print(init_str, "in {}".format(directory))
+            returncode = ys()
+            if returncode:
+                raise YSCommandError(returncode)
+                # We don't exit here but raise,
+                # in order to clean up the created new repository.
+
+            ys._remote_add(origin, repository)
+            self._print("Added a remote '{}' with path {}".
+                        format(origin, repository))
+            # raise YSCommandError(1)
+        except YSCommandError as err:
+            # we import shutil lazily here,
+            # because it is not used in other places
+            # and because this use case is marginal (not likely).
+            import shutil
+            # don't remove the base 'directory',
+            # because it could be created before us.
+            # It is safer to remove only .ys .
+            # Since ys is initialized without any config-dir options,
+            # this should be safe.
+            ysdir = ys.config_dir
+            # this is wrong for ysdir, since we already entered the directory
+            ysdir_full_path = os.path.join(directory, ys.config_dir)
+            # Cleaning up the directory allows to repeat the clone command
+            # without errors.
+            self._print("Cleaning up. Removing '{}'...".
+                        format(ysdir_full_path))
+            shutil.rmtree(ysdir)
+            self._print("Done.")
+            # print("Removed {}.".format(ysdir))
+            raise err
+
+        # todo: can we make pull or push accepting arguments?
+        # Or should we fix self._args to reuse the existing object?
+        ys_pull = YARsync(["yarsync", "-qq", "pull", origin])
+        ys_pull()
+        self._print("\n{} cloned.".format(origin))
 
     def _checkout(self, commit=None):
         """Checkout a commit.
