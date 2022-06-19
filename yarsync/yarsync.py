@@ -1122,27 +1122,11 @@ class YARsync():
         """
         # reponame will be written to repofile and used in logs.
         reponame = self._args.reponame
-        reponame_from_args = True
-        if reponame is None:
-            reponame = socket.gethostname()
-            reponame_from_args = False
-        if not reponame:
-            pass
-            self._print(
-                "To improve logging, provide a repository name "
-                "in {}".format(self.REPOFILE)
-            )
-            # _print_error(
-            #     "provide a repository name (for logging)"
-            # )
-            # # todo: this (with the larger logic)
-            # # should be moved to __init__ .
-            # return SYNTAX_ERROR
 
-        if reponame_from_args:
-            self._print("Initialize configuration for {}".format(reponame), level=2)
-        else:
-            self._print("Initialize configuration", level=2)
+        init_repo_str = "Initialize configuration"
+        if reponame:
+            init_repo_str += " for '{}'".format(reponame)
+        self._print(init_repo_str, level=2)
 
         # create config_dir
         ysdir = self.config_dir
@@ -1175,15 +1159,12 @@ class YARsync():
         if not os.path.exists(repofile):
             if not reponame:
                 self._print(
-                    "# To improve logging, provide a repository name "
-                    "as an argument to 'init'\n# or in {}".format(repofile)
+                    "# To use a repository name different from `hostname`"
+                    " for commit logs,\n"
+                    "# provide it as an argument to 'init'"
+                    " or write it to {}".format(repofile)
                 )
-            elif not reponame_from_args:
-                self._print(
-                    "# Repository name '{}' set from host name"\
-                    .format(reponame)
-                )
-            if reponame:
+            else:
                 self._print("# create configuration file {}".format(repofile))
                 with open(repofile, "w") as fil:
                     print(reponame, end="", file=fil)

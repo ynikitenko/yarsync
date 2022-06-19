@@ -56,11 +56,8 @@ def test_clone(tmpdir, clone_command):
              "path": TEST_DIR}
     }
     if "-n" in clone_command:
-        name = "clone"
-    else:
-        name = socket.gethostname()
-    with open(ys.REPOFILE) as repofile:
-        assert repofile.read() == name
+        with open(ys.REPOFILE) as repofile:
+            assert repofile.read() == "clone"
 
 
 def test_config(tmp_path):
