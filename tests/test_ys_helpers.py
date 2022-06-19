@@ -1,5 +1,6 @@
 """Test various small yarsync commands and configuration."""
 import os
+import socket
 
 import pytest
 
@@ -12,9 +13,15 @@ from yarsync.yarsync import (
 from .settings import TEST_DIR
 
 
-def test_clone(tmpdir):
-    clone_command = ["yarsync", "clone", "-o", "test_dir_repo",
-                     TEST_DIR, tmpdir.__str__()]
+@pytest.mark.parametrize(
+    "clone_command",
+    [
+        ["yarsync", "clone", "-o", "test_dir_repo", "-n", "clone"],
+        ["yarsync", "clone"],
+    ]
+)
+def test_clone(tmpdir, clone_command):
+    clone_command.extend([TEST_DIR, tmpdir.__str__()])
     with pytest.raises(SystemExit) as err:
         YARsync(clone_command)
         # normal exit with code 0
@@ -38,11 +45,22 @@ def test_clone(tmpdir):
     # all configuration was set correctly
     os.chdir(os.path.join(tmpdir, test_dir_name))
     ys = YARsync(["yarsync", "remote", "show"])
+
+    if "-o" in clone_command:
+        origin = "test_dir_repo"
+    else:
+        origin = "origin"
     assert ys._configdict == {
-        'test_dir_repo':
-            {'destpath': TEST_DIR,
-             'path': TEST_DIR}
+        origin:
+            {"destpath": TEST_DIR,
+             "path": TEST_DIR}
     }
+    if "-n" in clone_command:
+        name = "clone"
+    else:
+        name = socket.gethostname()
+    with open(ys.REPOFILE) as repofile:
+        assert repofile.read() == name
 
 
 def test_config(tmp_path):

@@ -113,7 +113,7 @@ CONFIG_EXAMPLE = """\
 ######################
 
 
-def _clone(repository, directory="", origin="origin"):
+def _clone(repository, directory="", origin="origin", name=None):
     if repository.endswith('/'):
         # ignore trailing slash
         repository = repository[:-1]
@@ -156,8 +156,14 @@ def _clone(repository, directory="", origin="origin"):
         os.chdir(directory)
         # todo: what about verbosity?
         # Probably make _print a separate function for that?
-        ys = YARsync(["yarsync", "-qq", "init"])
-        print("Initialized a new repository in {}".format(directory))
+        command = ["yarsync", "-qq", "init"]
+        if name is not None:
+            command.append(name)
+        ys = YARsync(command)
+        init_str = "Initialized a new repository"
+        if name is not None:
+            init_str += " " + name
+        print(init_str, "in {}".format(directory))
         returncode = ys()
         if returncode:
             raise YSCommandError(returncode)
@@ -369,6 +375,11 @@ class YARsync():
             help="use <name> of the remote repository instead of 'origin'",
             metavar="<name>"
         )
+        parser_clone.add_argument(
+            "-n", "--name", nargs="?",
+            help="name of the cloned repository",
+            metavar="<clone name>"
+        )
         parser_clone.add_argument("repository", help="source repository path")
         parser_clone.add_argument(
             "directory", nargs="?", default="",
@@ -549,7 +560,7 @@ class YARsync():
         if args.command_name == "clone":
             returncode = _clone(
                 repository=args.repository, directory=args.directory,
-                origin=args.origin
+                origin=args.origin, name=args.name
             )
             # if there was en error, it will be raised already.
             # We don't return an error code here, because we have
@@ -763,14 +774,19 @@ class YARsync():
 
         short_commit_mess = self._args.message
 
-        # platform.node() just calls socket.gethostname()
-        # with an error check
-        localhost = socket.gethostname()
+        try:
+            with open(self.REPOFILE) as repofile:
+                reponame = repofile.read()
+        except OSError:
+            # platform.node() just calls socket.gethostname()
+            # with an error check
+            reponame = socket.gethostname()
+
         username = getpass.getuser()
         time_str = time.strftime(self.DATEFMT, time.localtime())
 
-        log_str = "When: {date}\nWhere: {user}@{host}".format(
-            date=time_str, user=username, host=localhost
+        log_str = "When: {date}\nWhere: {user}@{repo}".format(
+            date=time_str, user=username, repo=reponame
         )
         if short_commit_mess:
             short_commit_mess += "\n\n"

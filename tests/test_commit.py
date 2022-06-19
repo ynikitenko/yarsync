@@ -35,7 +35,8 @@ def test_commit(mocker):
     mocker.patch("socket.gethostname", lambda: "host")
     mocker.patch("getpass.getuser", lambda: "user")
 
-    m = mocker.mock_open()
+    # we only read repofile. Otherwise must be changed!
+    m = mocker.mock_open(read_data="myhost")
     if sys.version[0] == "2":
         mocker.patch("__builtin__.open", m)
     else:
@@ -75,10 +76,14 @@ def test_commit(mocker):
         call().communicate(),
     ]
     assert m.mock_calls == [
+        call(ys.REPOFILE),
+        call().__enter__(),
+        call().read(),
+        call().__exit__(None, None, None),
         call(commit_log_path, "w"), call().__enter__(),
         call().write(commit_msg + "\n\n"
                      "When: Thu, 01 Jan 1970 03:00:03 MSK\n"
-                     "Where: user@host"),
+                     "Where: user@myhost"),
         call().write('\n'),
         call().__exit__(None, None, None),
     ]
