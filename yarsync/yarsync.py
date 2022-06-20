@@ -1926,3 +1926,46 @@ class YARsync():
         # in case of other errors, None will be returned!
         # todo: what code to return for RuntimeError?
         return returncode
+
+
+def main():
+    # parse arguments
+    try:
+        ys = YARsync(sys.argv)
+    except (argparse.ArgumentError, argparse.ArgumentTypeError,
+            YSArgumentError, YSUnrecognizedArgumentsError) as err:
+        ## Argparse error ##
+        # rsync returns 1 in case of syntax or usage error,
+        # therefore we use the same code
+        # (rsync is never called during __init__).
+        # the error message is printed by argparse.
+        sys.exit(SYNTAX_ERROR)
+    except (OSError, YSConfigurationError):
+        ## ys configuration error ##
+        # (not in a repository, configuration file missing, etc.)
+        # the error is printed by YARsync
+        sys.exit(CONFIG_ERROR)
+    except SystemExit as err:
+        ## Some runtime error ##
+        # SystemExit can be 130 for python
+        # and 1 for pypy for KeyboardInterrupt.
+        # Since this is interpreter-dependent => unreliable,
+        # we don't capture and return it.
+        # Moreover: we guarantee that our error code does not interfere
+        # with real rsync error codes (during the __init__).
+        if err.code == 0:
+            # normal argparse exit. For example, --help.
+            sys.exit(0)
+        else:
+            sys.exit(SYS_EXIT_ERROR)
+    except YSCommandError:
+        sys.exit(COMMAND_ERROR)
+
+    # make actual call
+    # this should throw no exceptions
+    returncode = ys()
+    sys.exit(returncode)
+
+
+if __name__ == "__main__":
+    main()
