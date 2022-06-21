@@ -250,6 +250,7 @@ class YARsync():
         verbose_group = parser.add_mutually_exclusive_group()
         verbose_group.add_argument("-q", "--quiet",
                                    action="count",
+                                   # otherwise default will be None
                                    default=0,
                                    help="decrease verbosity")
         verbose_group.add_argument("-v", "--verbose",
@@ -361,7 +362,11 @@ class YARsync():
         )
         pull_group.add_argument(
             "--new", action="store_true",
-            help="do not remove files here that are missing on source"
+            help="do not remove local data that is missing on source"
+        )
+        pull_group.add_argument(
+            "-b", "--backup", action="store_true",
+            help="changed local files are renamed (not overwritten or ignored)"
         )
 
         parser_pull.add_argument("source", metavar="<source>",
@@ -498,6 +503,9 @@ class YARsync():
         # directory with commits and other metadata
         # (may be updated by command line arguments)
         CONFIGDIRNAME = ".ys"
+        # default name for most repositories.
+        # Mostly used directly and hardly will be ever changed.
+        self.YSDIR = ".ys"
 
         root_dir = os.path.expanduser(args.root_dir)
         config_dir = os.path.expanduser(args.config_dir)
@@ -628,13 +636,18 @@ class YARsync():
         elif args.command_name in ["pull", "push"]:
             if args.command_name == "pull":
                 new = args.new
+                backup = args.backup
                 remote = args.source
             else:
                 new = False
+                backup = False
                 remote = args.destination
             self._func = functools.partial(
+                # common options
                 self._pull_push, args.command_name, remote,
-                force=args.force, new=new, overwrite=args.overwrite
+                force=args.force, overwrite=args.overwrite,
+                # pull options
+                new=new, backup=backup
             )
         elif args.command_name == "remote" and args.remote_command is None:
             self._func = self._remote_show
@@ -671,13 +684,32 @@ class YARsync():
         directory exists and is non-empty, it will be preserved
         and an error issued.
         """
+
+        ## check that repository has no rsync-filter
+        try:
+            remote_configs = self._get_remote_files(
+                os.path.join(repository, self.YSDIR) + '/'
+            )
+        except OSError:
+            raise OSError(
+                "could not read configuration at the repository {}".
+                format(repository)
+            )
+
+        if "rsync-filter" in remote_configs:
+            _print_error(
+                "repository configuration must not contain rsync-filter."
+                " Abort.\n  Repositories with filters can be synchronized "
+                "only as local ones (with pull or push)."
+            )
+            raise YSCommandError()
+
         if repository.endswith('/'):
             # ignore trailing slash
             repository = repository[:-1]
 
+        ## get directory name from the repository path
         if directory == "" or directory.endswith('/'):
-            ## get directory name from the repository path
-
             # os.path.split(path) returns a (head, tail) pair.
             # It is important that the path does not end in '/',
             # or tail will be empty!
@@ -685,7 +717,7 @@ class YARsync():
             directory = os.path.join(directory, repo_name)
 
         if ':' not in repository or os.path.exists(repository):
-            ## For a local path, make it absolute.
+            ## If the path is local, make it absolute.
             # Otherwise it will not work when we enter the *directory*.
             # rsync accepts paths like [USER@]HOST:SRC
             # todo: this will fail on Windows with C:\...
@@ -992,7 +1024,7 @@ class YARsync():
         command += [comm2_dir + '/', comm1_dir]
 
         if verbose:
-            print_command(*command)
+            self._print_command(*command)
 
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
         for line in iter(sp.stdout.readline, b''):
@@ -1150,33 +1182,51 @@ class YARsync():
 
     def _get_remote_commits(self, commit_dir, print_level=3):
         """Return remote commits as a list of integers."""
-        command = ["rsync", "--list-only", commit_dir]
-
-        self._print_command(" ".join(command), level=print_level)
-        sp = subprocess.Popen(command, stdout=subprocess.PIPE)
-
-        sp.wait()
-        returncode = sp.returncode
-        if returncode:
+        try:
+            remote_files = self._get_remote_files(commit_dir, print_level)
+        except OSError:
             raise OSError(
                 "error during listing remote commits: rsync returned {}"\
                 .format(returncode)
             )
 
         commits = []
-        for line in iter(sp.stdout.readline, b''):
-            comm = line.split()[-1]
-            if comm not in [b'.', b'..']:
-                # this works, but we don't test this,
-                # because it should be never needed
-                # (only in case of an error).
-                if not _is_commit(comm):
-                    raise OSError(
-                        "not a commit found on remote: {}".format(comm)
-                    )
-                commits.append(int(comm))
+        for comm in remote_files:
+            if not _is_commit(comm):
+                raise OSError(
+                    "not a commit found on remote: {}".format(comm)
+                )
+            commits.append(int(comm))
 
         return commits
+
+    def _get_remote_files(self, path, print_level=3):
+        """Return a list of files at the remote path.
+        Path can be one file (why though).
+        The result does not contain '.' and '..'.
+        Remote can be local.
+        """
+        command = ["rsync", "--list-only", path]
+        self._print_command(" ".join(command), level=print_level)
+        sp = subprocess.Popen(command, stdout=subprocess.PIPE)
+        sp.wait()
+
+        returncode = sp.returncode
+        if returncode:
+            raise OSError(
+                "error during listing remote files: rsync returned {}"\
+                .format(returncode)
+            )
+
+        files = []
+        for line in iter(sp.stdout.readline, b''):
+            fil = line.split()[-1]
+            if fil not in [b'.', b'..']:
+                # make them strings for easier use
+                # and coherent with os.listdir
+                files.append(fil.decode("utf-8"))
+
+        return files
 
     def _init(self, reponame):
         """Initialize default configuration.
@@ -1417,7 +1467,7 @@ class YARsync():
 
     def _pull_push(
             self, command_name, remote,
-            force=False, new=False, overwrite=False
+            force=False, new=False, overwrite=False, backup=False
         ):
         """Push/pull commits to/from destination or source.
 
@@ -1481,6 +1531,10 @@ class YARsync():
         if not overwrite:
             command.append("--ignore-existing")
             command_str += " --ignore-existing"
+
+        if backup:
+            command.append("--backup")
+            command_str += " --backup"
 
         # if there exists .ys/rsync-filter, command string needs quotes
         filter_, filter_str = self._get_filter()
@@ -1986,8 +2040,12 @@ def main():
         sys.exit(COMMAND_ERROR)
 
     # make actual call
-    # this should throw no exceptions
-    returncode = ys()
+    try:
+        # should this throw exceptions (_clone)
+        # or return a non-zero code (_pull_push)?
+        returncode = ys()
+    except YSCommandError:
+        sys.exit(COMMAND_ERROR)
     sys.exit(returncode)
 
 

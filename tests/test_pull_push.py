@@ -35,3 +35,13 @@ def test_pull_push_uncommitted(
     assert "Changed since head commit:\n" in captured.out
     # we allow printing changes.
     # assert not captured.out
+
+
+def _test_backup(tmp_path_factory):
+    local = tmp_path_factory.mktemp("local").__str__()
+    remote = tmp_path_factory.mktemp("remote").__str__()
+    print("created yarsync repositories {} and {}".format(remote, local))
+    ys = YARsync(["yarsync", "clone", TEST_DIR, remote])
+    ys()
+    ys._clone(remote, local)
+    assert False

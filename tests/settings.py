@@ -2,6 +2,8 @@ import os
 
 # directory with commits and logs
 TEST_DIR = os.path.join(os.path.dirname(__file__), "test_dir")
+# same as TEST_DIR, but with an rsync-filter
+TEST_DIR_FILTER = os.path.join(os.path.dirname(__file__), "test_dir_filter")
 # directory without commits and logs, but with a .ys configuration
 TEST_DIR_EMPTY = os.path.join(os.path.dirname(__file__), "test_dir_empty")
 # directory with no files and no .ys directory

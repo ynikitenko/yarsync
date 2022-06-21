@@ -8,7 +8,7 @@ import time
 from yarsync import YARsync
 from .settings import (
     TEST_DIR, TEST_DIR_EMPTY, YSDIR, TEST_DIR_YS_BAD_PERMISSIONS,
-    TEST_DIR_CONFIG_DIR, TEST_DIR_WORK_DIR
+    TEST_DIR_CONFIG_DIR, TEST_DIR_WORK_DIR, TEST_DIR_FILTER
 )
 
 
@@ -83,7 +83,7 @@ def test_status_no_commits(mocker):
 @pytest.mark.parametrize(
     "command,test_dir",
     [
-        (["yarsync"], TEST_DIR),
+        (["yarsync"], TEST_DIR_FILTER),
         (["yarsync", "--config-dir="+TEST_DIR_CONFIG_DIR], TEST_DIR_WORK_DIR),
     ]
 )
