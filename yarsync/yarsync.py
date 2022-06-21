@@ -233,24 +233,12 @@ class YARsync():
         parser.add_argument("--root-dir", default="",
                             help="path to the root of the working directory")
 
-        # not used
-        # parser.add_argument("-D", "--destname",
-        #                     help="destination name used for logging")
-        ## host = target = destination name,
-        ## or source name during yarsync init.
-        ## -H, because -h corresponds to --help.
-        # The algorithm is different depending on
-        # whether it's a remote or a local repository.
-
         parser.add_argument(
             "-n", "--dry-run", action="store_true",
             default=False,
             help="print what would be transferred during a real run, "
                  "but do not make any changes"
         )
-        # I think this should work with push, pull, and anything involving rsync
-        # (but not init or log or status? Or maybe give a hint what's going on?)
-        # Oh no, -n with log is number of commits.
 
         verbose_group = parser.add_mutually_exclusive_group()
         verbose_group.add_argument("-q", "--quiet",
@@ -270,8 +258,8 @@ class YARsync():
         # checkout #
         parser_checkout = subparsers.add_parser(
             "checkout",
-            help="check out a commit"
-            # help="restore the working directory to a local commit"
+            # help="check out a commit"
+            help="restore the working directory to a commit"
         )
         parser_checkout.add_argument(
             "-n", "--dry-run", action="store_true",
@@ -279,7 +267,11 @@ class YARsync():
             help="print what will be transferred during a real checkout, "
                  "but don't make any changes"
         )
-        parser_checkout.add_argument("commit", help="commit name")
+        # we write metavars <var> as in git,
+        # to distinguish them from rsync VAR.
+        parser_checkout.add_argument(
+            "commit", metavar="<commit>", help="commit name"
+        )
         parser_checkout.set_defaults(func=self._checkout)
 
         # clone #
@@ -288,18 +280,18 @@ class YARsync():
             help="clone a repository into a new directory"
         )
         parser_clone.add_argument(
-            "-o", "--origin", nargs="?", default="origin",
-            help="use <name> of the remote repository instead of 'origin'",
-            metavar="<name>"
+            "-o", "--origin", default="origin", metavar="<origin>",
+            help="name of the remote repository (by default 'origin')",
         )
         parser_clone.add_argument(
-            "-n", "--name", nargs="?",
-            help="name of the cloned repository",
-            metavar="<clone name>"
+            "-n", "--name", metavar="<clone>",
+            help="name of the new repository",
         )
-        parser_clone.add_argument("repository", help="source repository path")
         parser_clone.add_argument(
-            "directory", nargs="?", default="",
+            "repository", metavar="<repository>", help="source repository path"
+        )
+        parser_clone.add_argument(
+            "directory", metavar="<directory>", nargs="?", default="",
             help="directory with the new cloned repository"
         )
 
@@ -307,32 +299,40 @@ class YARsync():
         parser_commit = subparsers.add_parser(
             "commit", help="commit the working directory"
         )
-        parser_commit.add_argument("-m", "--message", default="",
-                                   help="commit message")
+        parser_commit.add_argument(
+            "-m", "--message", metavar="<message>", default="",
+            help="a string with the commit message"
+        )
         parser_commit.set_defaults(func=self._commit)
 
         # diff #
         parser_status = subparsers.add_parser(
             "diff", help="print the difference between two commits"
         )
-        parser_status.add_argument("commit", help="commit name")
-        parser_status.add_argument("other_commit", nargs="?", default=None,
-                                   help="other commit name")
+        parser_status.add_argument(
+            "commit", metavar="<commit>", help="commit name"
+        )
+        parser_status.add_argument(
+            "other_commit", metavar="<commit>", nargs="?", default=None,
+            help="other commit name"
+        )
         parser_status.set_defaults(func=self._diff)
 
         # init #
         parser_init = subparsers.add_parser("init",
                                             help="initialize a repository")
-        parser_init.add_argument("reponame", nargs="?",
-                                 help="name of the local initialized repository")
+        parser_init.add_argument(
+            "reponame", nargs="?", metavar="<reponame>",
+            help="name of the repository (for commits and logs)"
+        )
 
         # log #
         parser_log = subparsers.add_parser(
             "log", help="print commit logs"
         )
         parser_log.add_argument(
-            "-n", "--max-count", metavar="<number>", type=int,
-            default=-1,
+            "-n", "--max-count", metavar="<number>",
+            type=int, default=-1,
             help="maximum number of logs shown"
         )
         parser_log.add_argument("-r", "--reverse", action="store_true",
@@ -342,63 +342,72 @@ class YARsync():
 
         # pull #
         parser_pull = subparsers.add_parser(
-            "pull", help="fetch data from the source"
+            "pull", help="fetch data from source"
         )
-        pull_group = parser.add_mutually_exclusive_group()
+
+        # mutually exclusive arguments
+        pull_group = parser_pull.add_mutually_exclusive_group()
+        force_help = "remove commits and logs missing on source"
         pull_group.add_argument(
             "-f", "--force", action="store_true",
-            help="overwrite files, remove commits and logs missing on source"
+            help=force_help
         )
         pull_group.add_argument(
             "--new", action="store_true",
             help="do not remove files here that are missing on source"
         )
-        parser_pull.add_argument("source", nargs="?",
-                                 help="source name or path")
-        parser_pull.add_argument(
-            "-n", "--dry-run", action="store_true",
-            default=False,
-            help="print what would be transferred during a real run, "
-                 "but do not make any change"
-        )
-        parser_pull.set_defaults(func=self._pull_push)
+
+        parser_pull.add_argument("source", metavar="<source>",
+                                 help="source name")
 
         # push #
         parser_push = subparsers.add_parser(
-            "push", help="send data to the destination"
+            "push", help="send data to a destination"
         )
         parser_push.add_argument(
             "-f", "--force", action="store_true",
-            help="overwrite files, remove commits and logs missing on source"
-        )
-        parser_push.add_argument(
-            "-n", "--dry-run", action="store_true",
-            default=False,
-            help="print what would be transferred during a real run, "
-                 "but do not make any change"
+            help=force_help
         )
         # we don't allow pushing new files to remote,
         # because that could cause its inconsistent state
         # (while locally we merge new files manually)
-        parser_push.add_argument("destination", nargs="?",
-                                 help="destination name or path")
-        parser_push.set_defaults(func=self._pull_push)
+        parser_push.add_argument(
+            "destination", metavar="<destination>",
+            help="destination name"
+        )
+
+        # common pull and push options
+        for pparser in (parser_pull, parser_push):
+            pparser.add_argument(
+                "-n", "--dry-run", action="store_true",
+                default=False,
+                help="print what would be transferred during a real run, "
+                     "but do not make any change"
+            )
+            pparser.add_argument(
+                # not sure whether -o would be a good shortening
+                # (-o might go for options)
+                "--overwrite", action="store_true",
+                default=False,
+                help="propagate file changes"
+            )
 
         # remote #
         parser_remote = subparsers.add_parser(
             "remote", help="manage remote repositories"
         )
+        # this is a different option from "yarsync -v" here.
         parser_remote.add_argument(
             "-v", "--verbose",
             action="store_true",
             # action="count",
-            help="be verbose"
+            help="print repository paths"
         )
         subparsers_remote = parser_remote.add_subparsers(
             title="remote commands",
             dest="remote_command",
             help="type 'yarsync remote <command> --help' for additional help",
-            metavar="command",
+            metavar="<command>",
         )
 
         # parse_intermixed_args is missing in Python 2,
@@ -411,13 +420,14 @@ class YARsync():
         # )
         ## remote add
         parser_remote_add = subparsers_remote.add_parser(
-            "add", help="add remote"
+            "add", help="add a remote"
         )
         parser_remote_add.add_argument(
-            "repository", help="repository name",
+            "repository", metavar="<repository>",
+            help="repository name",
         )
         parser_remote_add.add_argument(
-            "path", help="repository path",
+            "path", metavar="<path>", help="repository path",
         )
         # not used yet.
         # parser_remote_add.add_argument(
@@ -425,10 +435,11 @@ class YARsync():
         # )
         ## remote rm
         parser_remote_rm = subparsers_remote.add_parser(
-            "rm", help="remove remote"
+            "rm", help="remove a remote"
         )
         parser_remote_rm.add_argument(
-            "repository", help="repository name",
+            "repository", metavar="<repository>",
+            help="repository name",
         )
 
         for remote_subparser in [parser_remote_add, parser_remote_rm]:
@@ -436,7 +447,7 @@ class YARsync():
 
         ## remote show, default
         parser_remote_show = subparsers_remote.add_parser(
-            "show", help="print remote"
+            "show", help="print remotes"
         )
         parser_remote_show.set_defaults(func=self._remote_show)
 
@@ -444,8 +455,9 @@ class YARsync():
         parser_show = subparsers.add_parser(
             "show", help="print log messages and actual changes for commit(s)"
         )
-        parser_show.add_argument("commit", nargs="+",
-                                   help="commit name")
+        parser_show.add_argument(
+            "commit", nargs="+", metavar="<commit>", help="commit name"
+        )
         parser_show.set_defaults(func=self._show)
 
         # status #
@@ -453,12 +465,6 @@ class YARsync():
             "status", help="print updates since last commit"
         )
         parser_status.set_defaults(func=self._status)
-
-        # other useful commands (to be implemented):
-        # clone? So that 1) can be bidirectional, to and from
-        #                   (unlike git)
-        #                2) know about hardlinks
-        #                3) know target name
 
         if len(argv) > 1:  # 0th argument is always present
             try:
@@ -600,20 +606,31 @@ class YARsync():
 
         # there is no easy way to set a default command
         # for a subparser, https://stackoverflow.com/a/46964652/952234
-        if args.command_name == "remote" and args.remote_command is None:
-            self._func = self._remote_show
+        if args.command_name == "clone":
+            self._func = functools.partial(
+                self._clone,
+                repository=args.repository, directory=args.directory,
+                origin=args.origin, name=args.name
+            )
         elif args.command_name == "init":
             # https://stackoverflow.com/a/41070441/952234
             self._func = functools.partial(self._init, args.reponame)
             # this also works, but lambdas can't be pickled
             # (even though we don't need that)
             # self._func = lambda: self._init(self._args.reponame)
-        elif args.command_name == "clone":
+        elif args.command_name in ["pull", "push"]:
+            if args.command_name == "pull":
+                new = args.new
+                remote = args.source
+            else:
+                new = False
+                remote = args.destination
             self._func = functools.partial(
-                self._clone,
-                repository=args.repository, directory=args.directory,
-                origin=args.origin, name=args.name
+                self._pull_push, args.command_name, remote,
+                force=args.force, new=new, overwrite=args.overwrite
             )
+        elif args.command_name == "remote" and args.remote_command is None:
+            self._func = self._remote_show
         else:
             self._func = args.func
 
@@ -1391,7 +1408,10 @@ class YARsync():
         self._print(commit_str, log_str, sep='\n', end='')
         # print(commit_str, log_str, sep='\n', end='')
 
-    def _pull_push(self):
+    def _pull_push(
+            self, command_name, remote,
+            force=False, new=False, overwrite=False
+        ):
         """Push/pull commits to/from destination or source.
 
         Several checks are made to prevent corruption:
@@ -1432,8 +1452,6 @@ class YARsync():
             )
             return COMMAND_ERROR
 
-        remote = self._args._remote
-
         try:
             full_destpath = self._get_dest_path(remote)
         except KeyError as err:
@@ -1449,18 +1467,11 @@ class YARsync():
             command += ["-n"]
         command_str = " ".join(command)
 
-        force = self._args.force
-        # --new can only be called with pull
-        if self._args.command_name == "pull":
-            new = self._args.new
-        else:
-            new = False
-
         if not new:
             command.append("--delete-after")
             command_str += " --delete-after"
 
-        if not force:
+        if not overwrite:
             command.append("--ignore-existing")
             command_str += " --ignore-existing"
 
@@ -1470,7 +1481,7 @@ class YARsync():
         command_str += " " + filter_str
 
         root_path = self.root_dir + "/"
-        if self._args.command_name == "push":
+        if command_name == "push":
             command.append(root_path)
             command.append(full_destpath)
             command_str += " {} {}".format(root_path, full_destpath)
@@ -1493,7 +1504,7 @@ class YARsync():
             # We require all commits, not only most recent ones.
             # We probably don't check for existence of local commits
             # if we want to push (that would raise an error).
-            if self._args.command_name == "push":
+            if command_name == "push":
                 missing_commits = self._get_missing_commits(
                     remote_commits_dir, self.COMMITDIR + '/'
                 )
