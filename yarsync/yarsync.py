@@ -233,12 +233,19 @@ class YARsync():
         parser.add_argument("--root-dir", default="",
                             help="path to the root of the working directory")
 
-        parser.add_argument(
-            "-n", "--dry-run", action="store_true",
-            default=False,
-            help="print what would be transferred during a real run, "
-                 "but do not make any changes"
-        )
+        # this option is applied not to all commands.
+        # Moreover, we can't write "yarsync -n 2 log" =>
+        # don't create an illusion
+        # that we can put an option at any place.
+        # However, the upside of leaving it here might be
+        # its better visibility during the general help
+        # (not for a subcommand).
+        # parser.add_argument(
+        #     "-n", "--dry-run", action="store_true",
+        #     default=False,
+        #     help="print what would be transferred during a real run, "
+        #          "but do not make any changes"
+        # )
 
         verbose_group = parser.add_mutually_exclusive_group()
         verbose_group.add_argument("-q", "--quiet",
