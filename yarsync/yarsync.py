@@ -344,7 +344,12 @@ class YARsync():
         parser_pull = subparsers.add_parser(
             "pull", help="fetch data from the source"
         )
-        parser_pull.add_argument(
+        pull_group = parser.add_mutually_exclusive_group()
+        pull_group.add_argument(
+            "-f", "--force", action="store_true",
+            help="overwrite files, remove commits and logs missing on source"
+        )
+        pull_group.add_argument(
             "--new", action="store_true",
             help="do not remove files here that are missing on source"
         )
@@ -364,7 +369,7 @@ class YARsync():
         )
         parser_push.add_argument(
             "-f", "--force", action="store_true",
-            help="remove commits and logs missing on source"
+            help="overwrite files, remove commits and logs missing on source"
         )
         parser_push.add_argument(
             "-n", "--dry-run", action="store_true",
@@ -1444,19 +1449,20 @@ class YARsync():
             command += ["-n"]
         command_str = " ".join(command)
 
+        force = self._args.force
         # --new can only be called with pull
-        # --force can only be called with push,
-        #   because we check working tree and other local issues
         if self._args.command_name == "pull":
             new = self._args.new
-            force = False
         else:
-            force = self._args.force
             new = False
 
         if not new:
             command.append("--delete-after")
             command_str += " --delete-after"
+
+        if not force:
+            command.append("--ignore-existing")
+            command_str += " --ignore-existing"
 
         # if there exists .ys/rsync-filter, command string needs quotes
         filter_, filter_str = self._get_filter()
