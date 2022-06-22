@@ -368,6 +368,10 @@ class YARsync():
             "-b", "--backup", action="store_true",
             help="changed local files are renamed (not overwritten or ignored)"
         )
+        pull_group.add_argument(
+            "--backup-dir", default="", metavar="DIR",
+            help="changed local files are put into DIR preserving their paths"
+        )
 
         parser_pull.add_argument("source", metavar="<source>",
                                  help="source name")
@@ -633,22 +637,28 @@ class YARsync():
             # this also works, but lambdas can't be pickled
             # (even though we don't need that)
             # self._func = lambda: self._init(self._args.reponame)
+
         elif args.command_name in ["pull", "push"]:
+
             if args.command_name == "pull":
                 new = args.new
-                backup = args.backup
+                backup_dir = args.backup_dir
+                backup = args.backup or backup_dir
                 remote = args.source
             else:
                 new = False
                 backup = False
+                backup_dir = ""
                 remote = args.destination
+
             self._func = functools.partial(
                 # common options
                 self._pull_push, args.command_name, remote,
                 force=args.force, overwrite=args.overwrite,
                 # pull options
-                new=new, backup=backup
+                new=new, backup=backup, backup_dir=backup_dir
             )
+
         elif args.command_name == "remote" and args.remote_command is None:
             self._func = self._remote_show
         else:
@@ -1467,11 +1477,12 @@ class YARsync():
 
     def _pull_push(
             self, command_name, remote,
-            force=False, new=False, overwrite=False, backup=False
+            force=False, new=False, overwrite=False,
+            backup=False, backup_dir=""
         ):
         """Push/pull commits to/from destination or source.
 
-        Several checks are made to prevent corruption:
+        By default, several checks are made to prevent corruption:
             - source has no uncommitted changes,
             - source has not a detached HEAD,
             - source is not in a merging state,
@@ -1479,6 +1490,8 @@ class YARsync():
 
         Note that the destination might have uncommitted changes:
         check that with *-n* (*--dry-run*) first!
+
+        *backup*, *backup_dir* and *new* only apply to pull.
         """
 
         if self._get_head_commit() is not None:
@@ -1529,10 +1542,16 @@ class YARsync():
             command_str += " --delete-after"
 
         if backup:
+            if backup_dir:
+                # create a full hierarchy in the backup_dir
+                command.extend(["--backup-dir", backup_dir])
+                # may contain spaces, ignore.
+                command_str += " --backup-dir " + backup_dir
+            # --backup is implied during --backup-dir
+            # only since this pull request in 2020
+            # https://github.com/WayneD/rsync/pull/35
+            # write new files near originals
             command.append("--backup")
-            # with this option it still creates a full hierarchy
-            # with commits in BACKUP
-            # command.append("--backup-dir=BACKUP")
             command_str += " --backup"
         elif not overwrite:
             command.append("--ignore-existing")

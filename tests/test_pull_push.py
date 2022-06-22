@@ -1,4 +1,5 @@
 import os
+import pathlib
 import pytest
 import subprocess
 
@@ -37,7 +38,8 @@ def test_pull_push_uncommitted(
     # assert not captured.out
 
 
-def test_backup(tmp_path_factory):
+@pytest.mark.parametrize("backup_dir", [True, False])
+def test_backup(tmp_path_factory, backup_dir):
     local_path = tmp_path_factory.mktemp("local")
     remote_path = tmp_path_factory.mktemp("remote")
     local = local_path.__str__()
@@ -45,14 +47,16 @@ def test_backup(tmp_path_factory):
 
     ## clone test_dir -> remote -> local
     # now local has remote as an "origin" remote
-    ys_clone = YARsync(["yarsync", "clone", TEST_DIR, remote])
+    ys_clone = YARsync(["yarsync", "-qq", "clone", TEST_DIR, remote])
     ys_clone()
     ys_clone._clone(remote, local)
     print("created yarsync repositories {} and {}".format(remote, local))
 
-    # corrupt a local file
+    # corrupt some local files
     local_a = local_path / "a"
     local_a.write_text("b\n")
+    local_d = local_path / "c" / "d"
+    local_d.write_text("c\n")
 
     os.chdir(local)
     ys_push = YARsync(["yarsync", "push", "origin"])
@@ -63,12 +67,32 @@ def test_backup(tmp_path_factory):
     # no evil was transferred!
     assert remote_a.read_text() == "a\n"
 
-    ys_pull_backup = YARsync(["yarsync", "pull", "--backup", "origin"])
+    ys_command = ["yarsync", "pull"]
+    if backup_dir:
+        ys_command.extend(["--backup-dir", "BACKUP"])
+    else:
+        ys_command.append("--backup")
+    ys_command.append("origin")
+    ys_pull_backup = YARsync(ys_command)
     ys_pull_backup()
+
     files = os.listdir()
-    assert set(files) == set(("a", "a~", "b", ".ys", "c"))
     # the correctness was transferred back again!
     # destination files are renamed
     assert local_a.read_text() == "a\n"
-    # and the wrongdoings were preserved as well
-    assert (local_path / "a~").read_text() == "b\n"
+    if backup_dir:
+        # there are two nested BACKUP-s: probably an rsync bug...
+        bd = pathlib.Path(".") / "BACKUP" / "BACKUP"
+        assert set(files) == set(("a", "b", ".ys", "c", "BACKUP"))
+        # old corrupt a is saved here
+        assert (bd / "a").read_text() == "b\n"
+        # the real hierarchy is backed up
+        assert (bd / "c" / "d").read_text() == "c\n"
+    else:
+        assert set(files) == set(("a", "a~", "b", ".ys", "c"))
+        # and the wrongdoings were preserved as well
+        assert (local_path / "a~").read_text() == "b\n"
+        assert (local_path / "c" / "d~").read_text() == "c\n"
+
+    # we can't pull or push in an updated state
+    assert ys_pull_backup._status(check_changed=True)[1] is True
