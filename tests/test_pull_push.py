@@ -37,11 +37,38 @@ def test_pull_push_uncommitted(
     # assert not captured.out
 
 
-def _test_backup(tmp_path_factory):
-    local = tmp_path_factory.mktemp("local").__str__()
-    remote = tmp_path_factory.mktemp("remote").__str__()
+def test_backup(tmp_path_factory):
+    local_path = tmp_path_factory.mktemp("local")
+    remote_path = tmp_path_factory.mktemp("remote")
+    local = local_path.__str__()
+    remote = remote_path.__str__()
+
+    ## clone test_dir -> remote -> local
+    # now local has remote as an "origin" remote
+    ys_clone = YARsync(["yarsync", "clone", TEST_DIR, remote])
+    ys_clone()
+    ys_clone._clone(remote, local)
     print("created yarsync repositories {} and {}".format(remote, local))
-    ys = YARsync(["yarsync", "clone", TEST_DIR, remote])
-    ys()
-    ys._clone(remote, local)
-    assert False
+
+    # corrupt a local file
+    local_a = local_path / "a"
+    local_a.write_text("b\n")
+
+    os.chdir(local)
+    ys_push = YARsync(["yarsync", "push", "origin"])
+    # if you have problems during push because of uncommitted changes,
+    # this might be because of hard links broken by git.
+    ys_push()
+    remote_a = remote_path / "a"
+    # no evil was transferred!
+    assert remote_a.read_text() == "a\n"
+
+    ys_pull_backup = YARsync(["yarsync", "pull", "--backup", "origin"])
+    ys_pull_backup()
+    files = os.listdir()
+    assert set(files) == set(("a", "a~", "b", ".ys", "c"))
+    # the correctness was transferred back again!
+    # destination files are renamed
+    assert local_a.read_text() == "a\n"
+    # and the wrongdoings were preserved as well
+    assert (local_path / "a~").read_text() == "b\n"

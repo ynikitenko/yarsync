@@ -1,11 +1,42 @@
 import os
+import pathlib
 
 import pytest
 
 from yarsync import YARsync
 from .settings import TEST_DIR, TEST_DIR_READ_ONLY, TEST_DIR_YS_BAD_PERMISSIONS
+# TEST_DIR = "test_dir"
 
 collect_ignore_glob = ["test_dir_*"]
+
+
+def fix_hardlinks(main_path, dest_paths):
+    for fil in os.listdir(main_path):
+        for dest in dest_paths:
+            dest_fil = dest / fil
+            if dest_fil.exists():
+                # it is important that files were never renamed,
+                # only unlinked (in the general sense).
+                # Note that if there were two old commits with one file
+                # (now deleted from the workdir), these won't be linked.
+                if dest_fil.is_file():
+                    # not is_dir()
+                    dest_fil.unlink()
+                    os.link(main_path / fil, dest_fil)
+                    # there is also Path.hardlink_to,
+                    # but only available since version 3.10.
+                else:
+                    new_dests = [dp / fil for dp in dest_paths]
+                    fix_hardlinks(main_path / fil, new_dests)
+
+
+@pytest.fixture(scope="package", autouse=True)
+def fix_test_hardlinks():
+    # since we clone only TEST_DIR, it would be enough
+    # to fix hard links there (they can get messed up by git).
+    test_dir = pathlib.Path(TEST_DIR)
+    commit_dir = test_dir / ".ys" / "commits"
+    fix_hardlinks(test_dir, commit_dir.iterdir())
 
 
 @pytest.fixture(scope="session")

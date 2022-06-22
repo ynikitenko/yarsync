@@ -1528,16 +1528,21 @@ class YARsync():
             command.append("--delete-after")
             command_str += " --delete-after"
 
-        if not overwrite:
+        if backup:
+            command.append("--backup")
+            # with this option it still creates a full hierarchy
+            # with commits in BACKUP
+            # command.append("--backup-dir=BACKUP")
+            command_str += " --backup"
+        elif not overwrite:
             command.append("--ignore-existing")
             command_str += " --ignore-existing"
 
-        if backup:
-            command.append("--backup")
-            command_str += " --backup"
-
+        # we don't include commits (filter them in)
+        # only if we do backups
+        include_commits = not backup
         # if there exists .ys/rsync-filter, command string needs quotes
-        filter_, filter_str = self._get_filter()
+        filter_, filter_str = self._get_filter(include_commits=include_commits)
         command.extend(filter_)
         command_str += " " + filter_str
 
