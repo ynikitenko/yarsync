@@ -1,0 +1,7 @@
+# If tox fails, remove this file.
+[build-system]
+requires = ["setuptools"]
+# for setuptools==60.10.0 it works (can't say the minimal version)
+build-backend = "setuptools.build_meta"
+# todo: probably move setup.py configuration here,
+# https://packaging.python.org/en/latest/tutorials/packaging-projects/#configuring-metadata

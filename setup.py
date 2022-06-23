@@ -11,11 +11,12 @@ setuptools.setup(
     author="Yaroslav Nikitenko",
     author_email="metst13@gmail.com",
     description="Yet Another Rsync is a file synchronization and backup tool",
+    license="GPLv3",
     long_description=long_description,
     long_description_content_type="text/x-rst",
     url="https://github.com/ynikitenko/yarsync",
     project_urls = {
-        'Documentation': 'https://github.com/ynikitenko/yarsync',
+        # 'Documentation': 'https://github.com/ynikitenko/yarsync',
         'Source': 'https://github.com/ynikitenko/yarsync',
         'Tracker': 'https://github.com/ynikitenko/yarsync/issues',
     },
@@ -29,6 +30,7 @@ setuptools.setup(
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Operating System :: POSIX :: Linux",
         "Programming Language :: Python :: 3 :: Only",
+        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
@@ -48,5 +50,5 @@ setuptools.setup(
             'yarsync = yarsync.yarsync:main',
         ]
     },
-    python_requires='>=3.8',
+    python_requires='>=3.7',
 )

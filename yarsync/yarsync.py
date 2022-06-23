@@ -994,7 +994,7 @@ class YARsync():
 
         return 0
 
-    def _diff(self, commit1=None, commit2=None, /, verbose=True):
+    def _diff(self, commit1=None, commit2=None, verbose=True):
         # arguments are positional only
         """Print the difference between *commit1* and *commit2*
         (from the old to the new one).

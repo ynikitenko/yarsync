@@ -76,7 +76,7 @@ Commands
     show
     status
 
-See `yarsync --help` for full command descriptions and options.
+See ``yarsync --help`` for full command descriptions and options.
 
 ----------------------------
 Requirements and limitations
