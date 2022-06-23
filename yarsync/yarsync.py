@@ -208,7 +208,7 @@ class YARsync():
         """*argv* is the list of command line arguments."""
 
         parser = argparse.ArgumentParser(
-            description="synchronize directories",
+            description="yarsync is a file synchronization and backup tool",
             # exit_on_error appeared only in Python 3.9
             # and doesn't seem to work. Skip and be more cross-platform.
             # exit_on_error=False

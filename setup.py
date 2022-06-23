@@ -7,32 +7,37 @@ with open("README.rst", "r") as readme:
 
 setuptools.setup(
     name="yarsync",
-    version="0.1-beta",
+    version="0.1",
     author="Yaroslav Nikitenko",
     author_email="metst13@gmail.com",
-    description="Yet Another Rsync is a file synchronization tool",
+    description="Yet Another Rsync is a file synchronization and backup tool",
     long_description=long_description,
     long_description_content_type="text/x-rst",
     url="https://github.com/ynikitenko/yarsync",
     project_urls = {
-        # todo: add yarsync/docs
-        # 'Documentation': "https://yarsync.readthedocs.io",
+        'Documentation': 'https://github.com/ynikitenko/yarsync',
         'Source': 'https://github.com/ynikitenko/yarsync',
         'Tracker': 'https://github.com/ynikitenko/yarsync/issues',
     },
-    keywords="distributed file synchronization, rsync, backup",
+    keywords="distributed, file, synchronization, rsync, backup",
     packages=setuptools.find_packages(exclude=['tests', 'tests.*']),
     classifiers=[
         "Development Status :: 4 - Beta",
         "Environment :: Console", 
-        "Intended Audience :: Developers",
-        "Programming Language :: Python",
+        "Intended Audience :: End Users/Desktop",
+        "Intended Audience :: System Administrators",
+        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+        "Operating System :: POSIX :: Linux",
+        "Programming Language :: Python :: 3 :: Only",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
-        # "Topic :: Scientific/Engineering :: Information Analysis",
-        # "Topic :: Software Development :: Libraries",
-        # "License :: OSI Approved :: Apache Software License",
-        # "Operating System :: OS Independent",
+        "Topic :: System :: Archiving",
+        "Topic :: System :: Archiving :: Backup",
+        "Topic :: System :: Archiving :: Mirroring",
+        "Topic :: Utilities",
     ],
     # briefly about entry points in Russian
     # https://npm.mipt.ru/youtrack/articles/GENERAL-A-87/Использование-setuptools-в-Python
@@ -43,5 +48,5 @@ setuptools.setup(
             'yarsync = yarsync.yarsync:main',
         ]
     },
-    python_requires='>=3.7',
+    python_requires='>=3.8',
 )
