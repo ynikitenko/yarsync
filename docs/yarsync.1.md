@@ -14,13 +14,12 @@ and synchronize repositories with the interface similar to git.
 It is efficient (files in the repository can be removed and renamed freely without additional transfers)
 and distributed (several replicas of the repository can diverge, and in that case a manual merge is supported).
 
-[comment]: # (**yarsync** stores snapshot versions in commits in .ys/commits subdirectory. It is non-intrusive)
-
+[comment]: # (to see it converted to man, use pandoc yarsync.1.md -s -t man | /usr/bin/man -l -)
 
 # OPTION SUMMARY
 
-|                    |                                                 |
-|--------------------|-------------------------------------------------|--
+|                    |                                                       |
+|--------------------|-------------------------------------------------------|
 | \--help, -h        |    show help message and exit
 | \--config-dir=DIR  |    path to the configuration directory
 | \--root-dir=DIR    |    path to the root of the working directory
@@ -30,18 +29,91 @@ and distributed (several replicas of the repository can diverge, and in that cas
 # COMMAND SUMMARY
 
 |              |                                                             |
-|--------------|-------------------------------------------------------------|--
+|--------------|-------------------------------------------------------------|
+|              |
 | **checkout** |    restore the working directory to a commit
 | **clone**    |    clone a repository into a new directory
 | **commit**   |    commit the working directory
 | **diff**     |    print the difference between two commits
 | **init**     |    initialize a repository
 | **log**      |    print commit logs
-| **pull**     |    fetch data from source
+| **pull**     |    get data from a source
 | **push**     |    send data to a destination
 | **remote**   |    manage remote repositories
 | **show**     |    print log messages and actual changes for commit(s)
 | **status**   |    print updates since last commit
+
+# QUICK START
+
+To create a new repository, enter the directory with its files and type
+
+    yarsync init
+
+This operation is safe and will not affect existing files
+(including configuration files in an existing repository).
+Alternatively, run **init** inside an empty directory and add files afterwards.
+To complete the initialization, make a commit:
+
+    yarsync commit -m "Initial commit"
+
+**commit** creates a snapshot of the working directory,
+which is all files in the repository except **yarsync** configuration and data.
+This snapshot is very small, because it uses hard links.
+To check how much your directory size has changed, run **du**(1).
+
+Commit name is the number of seconds since the epoch (integer Unix time).
+This allows commits to be ordered in time, even for hosts in different zones.
+Though this works on most Unix systems and Windows, the epoch is platform dependent.
+
+After creating a commit, files can be renamed, deleted or added.
+To see what was changed since the last commit, use **status**.
+To see the history of existing commits, use **log**.
+
+Hard links are excellent at tracking file moves or renames
+and storing accidentally removed files.
+Their downside is that if a file gets corrupt,
+this will apply to all of its copies in local commits.
+The 3-2-1 backup rule implies that one should have at least 3 copies of data,
+so let us add a remote repository \"my\_remote\":
+
+    yarsync remote add my_remote remote:/path/on/my/remote
+
+For local copies we still call the repositories \"remote\",
+but their paths will be local:
+
+    yarsync remote add my_drive /mnt/my_drive/my_repo
+
+This command only updated our configuration,
+but did not make any changes at the remote path (which may not exist).
+To make a local copy of our repository, run
+
+    yarsync clone . /mnt/my_drive/my_repo
+
+**clone** copies all repository data (except the configuration) to the new replica
+and adds the original repository to its remotes with the name \"origin\".
+To copy the repository to a remote host, just copy its files (preserving hard links):
+
+    rsync -avHP ./ remote:/path/on/my/remote
+
+Here \'**-H**\' stands for hard links. If the first path ends with
+a slash, data will be copied to \"remote/\", otherwise to its subdirectory.
+Similarly, one can copy a repository *from* a remote: just change the order of paths
+and don't forget about the slash.
+To check that we set up the repositories correctly, make a dry run with \'**-n**\':
+
+    yarsync push -n my_remote
+
+If there are no errors and no file transfers, then we have a functioning remote.
+We can continue working locally, adding and removing files and making commits.
+When we want to synchronize repositories, we **push** the changes *to*
+or **pull** them *from* a remote (first with a **\--dry-run**).
+This is the recommended workflow, and if we work on different repositories
+in sequence and always synchronize changes, our life will be easy.
+Sometimes, however, we may forget to synchronize two replicas
+and they will end up in a diverged state;
+we may actually change some files or find them corrupt.
+Solutions to these problems involve user decisions
+and are described in **pull** and **push** options.
 
 # OPTIONS
 
@@ -234,10 +306,15 @@ In case of rsync errors, its error code is returned.
 The yarsync page is <https://github.com/ynikitenko/yarsync>.
 
 # BUGS
-Please report bugs to <https://github.com/ynikitenko/yarsync/issues>.
+This is the first release.
+Some corner cases during **clone** are not handled
+and raise Python errors instead of correct return codes.
+The output messages deserve to be improved.
+Please be patient and please report bugs to
+<https://github.com/ynikitenko/yarsync/issues>.
 
 # COPYRIGHT
 Copyright © 2021-2022 Yaroslav Nikitenko.
 License GPLv3: GNU GPL version 3 <https://gnu.org/licenses/gpl.html>.\
-This  is free software: you are free to change and redistribute it.  There is NO
+This is free software: you are free to change and redistribute it. There is NO
 WARRANTY, to the extent permitted by law.
