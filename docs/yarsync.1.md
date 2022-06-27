@@ -8,40 +8,13 @@ Yet Another Rsync is a file synchronization and backup tool
 # SYNOPSIS
 yarsync [-h] \[\--config-dir CONFIG\_DIR\] \[\--root-dir ROOT\_DIR\] \[-q | -v\] command \[args\]
 
+[comment]: # (to see it converted to man, use pandoc yarsync.1.md -s -t man | /usr/bin/man -l -)
+
 # DESCRIPTION
 **yarsync** is a wrapper around rsync to store configuration
 and synchronize repositories with the interface similar to git.
 It is efficient (files in the repository can be removed and renamed freely without additional transfers)
 and distributed (several replicas of the repository can diverge, and in that case a manual merge is supported).
-
-[comment]: # (to see it converted to man, use pandoc yarsync.1.md -s -t man | /usr/bin/man -l -)
-
-# OPTION SUMMARY
-
-|                    |                                                       |
-|--------------------|-------------------------------------------------------|
-| \--help, -h        |    show help message and exit
-| \--config-dir=DIR  |    path to the configuration directory
-| \--root-dir=DIR    |    path to the root of the working directory
-| \--quiet, -q       |    decrease verbosity
-| \--verbose, -v     |    increase verbosity
-
-# COMMAND SUMMARY
-
-|              |                                                             |
-|--------------|-------------------------------------------------------------|
-|              |
-| **checkout** |    restore the working directory to a commit
-| **clone**    |    clone a repository into a new directory
-| **commit**   |    commit the working directory
-| **diff**     |    print the difference between two commits
-| **init**     |    initialize a repository
-| **log**      |    print commit logs
-| **pull**     |    get data from a source
-| **push**     |    send data to a destination
-| **remote**   |    manage remote repositories
-| **show**     |    print log messages and actual changes for commit(s)
-| **status**   |    print updates since last commit
 
 # QUICK START
 
@@ -61,7 +34,7 @@ which is all files in the repository except **yarsync** configuration and data.
 This snapshot is very small, because it uses hard links.
 To check how much your directory size has changed, run **du**(1).
 
-Commit name is the number of seconds since the epoch (integer Unix time).
+Commit name is the number of seconds since the Epoch (integer Unix time).
 This allows commits to be ordered in time, even for hosts in different zones.
 Though this works on most Unix systems and Windows, the epoch is platform dependent.
 
@@ -115,6 +88,33 @@ we may actually change some files or find them corrupt.
 Solutions to these problems involve user decisions
 and are described in **pull** and **push** options.
 
+# OPTION SUMMARY
+
+|                    |                                                       |
+|--------------------|-------------------------------------------------------|
+| \--help, -h        |    show help message and exit
+| \--config-dir=DIR  |    path to the configuration directory
+| \--root-dir=DIR    |    path to the root of the working directory
+| \--quiet, -q       |    decrease verbosity
+| \--verbose, -v     |    increase verbosity
+
+# COMMAND SUMMARY
+
+|              |                                                             |
+|--------------|-------------------------------------------------------------|
+|              |
+| **checkout** |    restore the working directory to a commit
+| **clone**    |    clone a repository into a new directory
+| **commit**   |    commit the working directory
+| **diff**     |    print the difference between two commits
+| **init**     |    initialize a repository
+| **log**      |    print commit logs
+| **pull**     |    get data from a source
+| **push**     |    send data to a destination
+| **remote**   |    manage remote repositories
+| **show**     |    print log messages and actual changes for commit(s)
+| **status**   |    print updates since last commit
+
 # OPTIONS
 
 **\--help**, **-h**
@@ -125,7 +125,7 @@ After a command name, prints help for that command.
 **\--config-dir=DIR**
 : Provides the path to the configuration directory if it is detached.
 Both **\--config-dir** and **\--root-dir** support tilde expansion for
-user's home directory.
+user's home directory. See SPECIAL REPOSITORIES for usage details.
 
 **\--root-dir=DIR**
 : Provides the path to the root of the working directory for a detached repository.
@@ -139,13 +139,36 @@ If not set explicitly, the default working directory is the current one.
 : Increases verbosity. May print more rsync commands and output.
 Conflicts with **\--quiet**.
 
+# SPECIAL REPOSITORIES
+
+A **detached** repository is one with the **yarsync** configuration directory
+outside the working directory.
+To use such repository, one must provide **yarsync** options
+**\--config-dir** and **\--root-dir** with every command
+(**alias**(1p) may be of help).
+To create a detached repository, use **init** with these options
+or move the existing configuration directory manually.
+For example, if one wants to have several versions of static Web pages,
+they may create a detached repository and publish the working directory
+without the Web server having access to the configuration.
+Commits can be created or checked out,
+but **pull** or **push** are not supported for such repositories
+(one will have to synchronize them manually).
+A detached repository is similar to a bare repository in git,
+but always has a working directory.
+
+A repository with a **filter** can exclude (disable tracking) some files or directories
+from the working directory.
+This may be convenient, but makes synchronization less reliable,
+and such repository can not be used as a remote.
+See **rsync-filter** in the FILES section for more details.
+
 # FILES
 
 All **yarsync** repository configuration and data is stored
 in the hidden directory **.ys** under the root of the working directory.
 If the user no longer wants to use **yarsync** and the working directory
 is in the desired state, they can safely remove the **.ys** directory.
-We omit the parent path \".ys/\" for file descriptions below.
 
 Note that only commits and logs (apart from the working directory)
 are synchronized between the repositories.
@@ -153,17 +176,17 @@ Each repository has its own configuration and name.
 
 ## User configuration files
 
-**config.ini**
+**.ys/config.ini**
 : Contains names and paths of remote repositories.
 This file can be edited directly or with **remote** commands
 according to user's preference.
 
     **yarsync** supports synchronization
 with only existing remotes.
-A simple configuration for a remote "my\_remote" could be:
+A simple configuration for a remote \"my\_remote\" could be:
 
-    |    [my\_remote]
-    |    path = remote:/path/on/my/remote
+        [my_remote]
+        path = remote:/path/on/my/remote
 
     Several sections can be added for more remotes.
 An example (non-effective) configuration is created during **init**.
@@ -173,14 +196,14 @@ during **remote {add,rm}**.
     Since removable media or remote hosts can change their paths
 or IP addresses, one may use variable substitution in paths:
 
-    |    [my_drive]
-    |    path = $MY\_DRIVE/my\_repo
+        [my_drive]
+        path = $MY_DRIVE/my_repo
 
     For the substitutions to take the effect,
 export these variables before run:
 
-    |    $ export MY_DRIVE=/run/media/my_drive
-    |    $ yarsync push -n my_drive
+        $ export MY_DRIVE=/run/media/my_drive
+        $ yarsync push -n my_drive
 
     If we made a mistake in the variable or path,
 it will be shown in the printed command.
@@ -195,8 +218,8 @@ Empty **host** means local host and does not prepend the path.
 from the section name.
 For that, add a default section with an option **host_from_section_name**:
 
-    |    [DEFAULT]
-    |    host_from_section_name
+        [DEFAULT]
+        host_from_section_name
 
     Empty lines and lines starting with \'**#**\' are ignored.
 White spaces in a section name will be considered parts of its name.
@@ -204,7 +227,7 @@ Spaces around \'**=**\' are allowed.
 Full syntax specification can be found at
 <https://docs.python.org/3/library/configparser.html>.
 
-**repository.txt**
+**.ys/repository.txt**
 : Contains the repository name, which is used in logs
 and usually coincides with the remote name
 (how local repository is called on remotes).
@@ -223,7 +246,7 @@ these names can be empty.
 If there is an error getting the host name during **commit**,
 provide the name in the **repository.txt**.
 
-**rsync-filter**
+**.ys/rsync-filter**
 : Contains rsync filter rules, which effectively define what data belongs
 to the repository.
 The **rsync-filter** does not exist by default, but can be added for flexibility.
@@ -233,10 +256,10 @@ but wants to keep his presentations in \"tex/\" in a separate repository.
 Instead of having a different directory \"~/work\_tex\", he adds such rules
 to **rsync-filter**:
 
-    |    \# all are in git repositories
-    |    \- /repos
-    |    \# take care to sync separately
-    |    \- /tex
+        \# all are in git repositories
+        \- /repos
+        \# take care to sync separately
+        \- /tex
 
     In this way, \"~/work/tex\" and contained git repositories will be excluded
 from \"~/work\" synchronization. Lines starting with \'**#**\' are ignored,
@@ -253,7 +276,7 @@ remote filters (make sure you synchronize only *from* a repository with filters)
 while **clone** refuses to copy a repository with **rsync-filter**.
 
 ## yarsync technical directories
-**commits/**
+**.ys/commits/**
 : Contains local commits (snapshots of the working directory).
 If some of the old commits are no longer needed (there are too many of them
 or they contain a large file), they can be removed.
@@ -262,7 +285,7 @@ the present commits, otherwise future synchronization will get complicated.
 Alternatively, remove unneeded files or folders manually:
 commits can be edited, with care taken to synchronize them correctly.
 
-**logs/**
+**.ys/logs/**
 : Contains text logs produced during **commit**.
 They are not necessary, so removing any of them will not break the repository.
 If one wants to fix or improve a commit message though,
