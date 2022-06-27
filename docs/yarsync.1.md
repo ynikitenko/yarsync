@@ -323,17 +323,46 @@ is raised in the Python interpreter.
 
 In case of rsync errors, its error code is returned.
 
+# DIAGNOSTICS
+
+To check that your clocks (used for properly ordering commits) at different hosts
+are synchronized well enough, run
+
+    python -c 'import time; print(time.time())'
+
+To make sure that the local repository supports hard links
+instead of creating file copies, test it with
+
+    du -sh .
+    du -sh .ys
+
+(can be run during **pull** or **clone** if it takes a long time).
+The results must be almost the same. If not, you may not use **yarsync**
+on this file system, have large deleted files stored in old commits
+or you may have subdirectories excluded with a **filter**
+(see SPECIAL REPOSITORIES section).
+
+To test that a particular file \"a\" was hard linked to its committed versions, run
+
+    ls -i a .ys/commits/*/a
+
+If all is correct, their inodes must be the same.
+To create a hard link, use **ln**(1).
+
+Hard links may be broken in a cloned git repository
+(as it happens with **yarsync** tests), because git does not preserve them.
+To fix hard links for the whole repository, run **hardlink**(1) in its root.
+
 # SEE ALSO
 **rsync**(1)
 
 The yarsync page is <https://github.com/ynikitenko/yarsync>.
 
 # BUGS
-This is the first release.
 Some corner cases during **clone** are not handled
 and raise Python errors instead of correct return codes.
 The output messages deserve to be improved.
-Please be patient and please report bugs to
+Please be patient and please report any bugs or make feature requests to
 <https://github.com/ynikitenko/yarsync/issues>.
 
 # COPYRIGHT
