@@ -6,15 +6,19 @@
 Yet Another Rsync is a file synchronization and backup tool
 
 # SYNOPSIS
-yarsync [-h] \[\--config-dir CONFIG\_DIR\] \[\--root-dir ROOT\_DIR\] \[-q | -v\] command \[args\]
+**yarsync** [**-h**] \[**\--config-dir** *DIR*\] \[**\--root-dir** *DIR*\] \[**-q** | **-v**\] *command* \[*args*\]
 
 [comment]: # (to see it converted to man, use pandoc yarsync.1.md -s -t man | /usr/bin/man -l -)
 
 # DESCRIPTION
-**yarsync** is a wrapper around rsync to store configuration
+**yarsync** is a wrapper around rsync to store its configuration
 and synchronize repositories with the interface similar to git.
-It is efficient (files in the repository can be removed and renamed freely without additional transfers)
-and distributed (several replicas of the repository can diverge, and in that case a manual merge is supported).
+It is *efficient* (files in the repository can be removed
+and renamed freely without additional transfers),
+*distributed* (several replicas of the repository can diverge,
+and in that case a manual merge is supported),
+*safe* (it takes care to prevent data loss and corruption)
+and *simple* (see this manual).
 
 # QUICK START
 
@@ -139,6 +143,344 @@ If not set explicitly, the default working directory is the current one.
 : Increases verbosity. May print more rsync commands and output.
 Conflicts with **\--quiet**.
 
+# COMMANDS
+
+All commands support the **\--help** option.
+Commands that can change the repository also support the **\--dry-run** option.
+
+**\--dry-run**, **-n**
+: Prints what will be transferred during a real run, but does not make any changes.
+
+**\--help**, **-h**
+: Prints help for a command or a subcommand.
+
+# checkout
+
+**yarsync checkout** \[**-h**] \[**-n**] *commit*
+
+Restores the working directory to its state during *commit*.
+WARNING: this will overwrite the working directory.
+Make sure that all important data is committed.
+Make a dry run first with **-n**.
+
+If not the most recent commit was checked out,
+the repository HEAD (in git terminology, see **git-checkout**(1)) becomes detached,
+which prevents such operations as **pull** or **push**.
+To advance the repository to its correct state, check out the last commit
+or make a new one.
+
+*commit*
+: The commit name (as printed in **log** or during **commit**).
+
+# clone
+
+**yarsync clone** \[**-h**] \[**-o** *origin*] \[**-n** *clone*] *repository* *directory*
+
+Clones a *repository* to a *directory*.
+Non-existent paths will be created.
+Non-empty directories will be unchanged (and an error will be issued).
+
+Note that only data (working directory, commits and logs,
+not configuration files) will be cloned.
+This command will refuse to clone a repository with a filter (see SPECIAL REPOSITORIES).
+
+### Positional arguments
+*repository*
+: A path to the source repository (local or remote).
+
+*directory*
+: A path to the cloned local repository.
+If *directory* ends with a \'**/**\', the new repository will be created
+as its subdirectory with the name taken from the last part of the repository path.
+
+### Options
+**\--origin**=*origin*, **-o**
+: Name of the remote repository for the cloned one (by default \"origin\").
+
+**\--name**=*clone*, **-n**
+: Name of the new repository (as it could be named during **init**).
+
+# commit
+**yarsync commit** \[**-h**] \[**-m** *message*]
+
+Commits the working directory (makes its snapshot).
+See QUICK START for more details on commits.
+
+*message*
+: Commit message (used in logs). Can be empty.
+
+# diff
+
+**yarsync diff** \[**-h**] *commit* \[*commit*]
+
+Prints the difference between two commits
+(from old to the new one, the order of arguments is unimportant).
+If the second commit is omitted, compares *commit* to the most recent one.
+See **status** for the output format.
+
+*commit*
+: Commit name.
+
+# init
+
+**yarsync init** \[**-h**] \[*reponame*]
+
+Initializes a **yarsync** repository in the current directory.
+Creates a configuration folder with repository files.
+Existing configuration and files in the working directory are unchanged.
+Create a first commit for the repository to become fully operational.
+
+*reponame*
+: Name of the repository (logged during commits).
+
+# log
+
+**yarsync log** [**-h**] \[**-n** *number*] \[**-r**]
+
+Prints commit logs (from newest to oldest),
+as well as synchronization information when it is available.
+To see changes in the working directory, use **status**.
+
+### Options
+
+**\--max-count**=*number*, **-n**
+: Maximum number of logs shown.
+
+**\--reverse**, **-r**
+: Reverse log order.
+
+### Example
+
+To print information about the three most recent commits, use
+
+    yarsync log -n 3
+
+# pull
+
+**yarsync pull** \[**-h**] \[**-f** | **\--new** | **-b** | **\--backup-dir** *DIR*] [**-n**] \[**\--overwrite**] *source*
+
+Gets data from a remote *source*.
+The difference between **pull** and **push** is mostly only the direction of transfer.
+
+**pull** and **push** bring two repositories into the same state.
+They synchronize the working directory,
+that is they add to the destination new files from source,
+remove those missing on source
+and do all renames and moves of previously committed files efficiently.
+This is done in one run, and these changes apply also to logs and commits.
+In most cases, we do not want our existing logs and commits to be removed though.
+By default, several checks are made to prevent data loss:
+
+    - local has no uncommitted changes,
+    - local has not a detached HEAD,
+    - local is not in a merging state,
+    - destination has no commits missing on source.
+
+If any of these cases is in effect, no modifications will be made.
+Note that the remote may have uncommitted changes itself:
+always make a dry run with **-n** first!
+
+To commit local changes to the repository, use **commit**.
+HEAD commit could be changed during **checkout** (see its section for the solutions).
+If the destination has commits missing on source, there are two options:
+to **\--force** changes to the destination (removing these commits)
+or to merge changes inside the local repository with **pull \--new**.
+
+If we pull new commits from the remote, this will bring repository into a merging state.
+Merge will be done automatically if the last remote commit is among local ones
+(in that case only some older commits were transferred from there).
+If some recent remote commits are not present locally, however,
+this means that histories of the repositories diverged,
+and we will need to merge them manually.
+After we have all local and remote commits
+and the union of the working directories in our local repository,
+we can safely choose the easiest way for us to merge them.
+To see the changes, use **status** and **log**.
+For example, if we added a file in a *remote_commit* before and it was added now,
+we can just **commit** the changes.
+If we have made many local changes, renames and removals since then, we may better
+**checkout** our latest commit
+(remember that all files from the working directory are present in commits,
+so it is always safe)
+and link the new file to the working directory:
+
+    ln .ys/commits/<remote_commit>/path/to/file .
+
+(it can be moved to its subdirectory without the risk of breaking hard links).
+If the remote commit was actually large, and local changes were recent but small,
+then we shall check out the remote commit and apply local changes by hand.
+After our working directory is in the desired state,
+we **commit** changes and the merge is finished.
+The result shall be pushed to the remote without problems.
+
+### pull options
+
+**\--new**
+: Do not remove local data that is missing on *source*.
+While this option can return deleted or moved files
+back to the working directory, it also adds remote logs and commits
+that were missing here (for example, old or unsynchronized commits).
+A forced **push** to the remote could remove
+these logs and commits, and this option allows one to **pull**
+them first to the local repository.
+
+    After **pull \--new** the local repository can enter a merging state.
+See **pull** description for more details.
+
+**\--backup**, **-b**
+: Changed files in the working directory are renamed (appended with \'**~**\').
+See **\--backup-dir** for more details.
+
+**\--backup-dir** *DIR*
+: Changed local files are put into a directory *DIR* preserving their relative paths.
+*DIR* can be an absolute path or relative to the root of the repository.
+In contrast to **\--backup**, **\--backup-dir** does not change resulting file names.
+
+    This option is convenient for large file trees,
+because it recreates the existing file structure of the repository
+(one doesn't have to search for new backup files in all subdirectories).
+For current rsync version, the command
+
+        yarsync pull --backup-dir BACKUP <remote>
+
+    will copy updated files from the remote
+and put them into the directory \"BACKUP/BACKUP\" (this is how rsync works).
+To reduce confusion, make standard **pull** first
+(so that during the backup there are only file updates).
+
+    This option is available only for **pull**,
+because it is assumed that the user will apply local file changes after backup.
+For example, suppose that after a **pull \--backup**
+one gets files *a* and *a~* in the working directory.
+One should first see, which version is correct.
+If it is the local file *a~*, then the backup can be removed:
+
+        mv a~ a*
+
+    By local we mean the one hard linked with local commits
+(run *ls -i* to be sure).
+If the remote version is correct though, you need first to
+overwrite the local version not breaking the hard links.
+This can be done with an rsync option \"\--inplace\":
+
+        rsync --inplace a a~
+        mv a~ a
+        # check file contents and the links
+        ls -i a .ys/commits/*/a
+
+    For a **\--backup-dir** and for longer paths these commands will be longer.
+Finally, if you need several versions,
+just save one of the files under a different name in the repository.
+
+    After you have fixed all corrupt files, push them back to the remote.
+See the **\--overwrite** option for propagation of file changes.
+
+### pull and push options
+
+**\--force**, **-f**
+: Updates the working directory, removing commits and logs missing on source.
+This command brings two repositories to the nearest possible states:
+their working directories, commits and logs become the same.
+While working directories are always identical after **pull** or **push**
+(except for some of the **pull** options),
+**yarsync** generally refuses to remove existing commits or logs \- unless
+this option is given.
+Use it if the destination has really unneeded commits
+or just remove them manually (see FILES for details on the commit directory).
+See also **pull \--new** on how to fetch missing commits
+and **\--overwrite** on synchronizing file contents.
+
+**\--overwrite**
+: Propagates file changes.
+By default, files in a **yarsync** repository are not changed,
+therefore actual changes are not transferred to other repositories
+to prevent file corruption.
+If you are confident that the local files for **push** (or remote ones for **pull**)
+are correct (for example, you just repaired them with the **\--backup** options),
+you can synchronize changes with this option.
+
+# push
+
+**yarsync push** \[**-h**] \[**-f**] \[**-n**] \[**\--overwrite**] *destination*
+
+Sends data to a remote *destination*. See **pull** for more details and common options.
+
+# remote
+**yarsync remote** \[**-h**] \[**-v**] \[*command*]
+
+Manages remote repositories configuration.
+By default, prints existing remotes.
+For more options, see *.ys/config.ini* in the FILES section.
+
+**-v**
+: Verbose. Prints remote paths as well.
+
+### **add**
+
+**yarsync remote add** \[**-h**] *repository* *path*
+
+Adds a new remote.
+*repository* is the name of the remote in local **yarsync** configuration
+(as it will be used later during **pull** or **push**).
+*path* has a standard form \[user@]host:\[path] for an actually remote host
+or it can be a local path. Since **yarsync** commands can be called
+from any subdirectory, local path should be absolute.
+Tilde for user's home directory \'**~**\' in paths is allowed.
+
+### rm
+
+**yarsync remote rm** \[**-h**\] *repository*
+
+Removes an existing *repository* from local configuration.
+
+### show
+Prints remote repositories. Default.
+
+# show
+**yarsync show** \[**-h**] *commit* \[*commit* ...\]
+
+Prints log messages and actual changes for commit(s).
+Changes are shown compared to the commit before *commit*.
+For the output format, see **status**.
+Information for several commits can be requested as well.
+
+*commit*
+: Commit name.
+
+# status
+
+**yarsync status** \[**-h**]
+
+Prints working directory updates since the last commit and the repository status.
+If there were no errors, this command always returns success
+(irrespective of uncommitted changes).
+
+### Output format of the updates
+
+The output for the updates is a list of changes, including attribute changes,
+and is based on the format of *rsync \--itemize-changes*.
+For example, a line
+
+    .d..t...... programming/
+
+means that the modification time \'*t*\' of the directory \'*d*\' *programming/*
+in the root of the repository has changed (files were added or removed from that).
+All its other attributes are unchanged (\'.\').
+
+The output is an 11-letter string of the format \"YXcstpoguax\",
+where \'Y\' is the update type, \'X\' is the file type,
+and the other letters represent attributes
+that are printed if they were changed.
+For a newly created file these would be \'+\', like
+
+    >f+++++++++ /path/to/file
+
+The attribute letters are: **c**hecksum, **s**ize, modification **t**ime,
+**p**ermissions, **o**wner and **g**roup.
+**u** can be in fact **u**se (access) or creatio**n** time, or **b**oth.
+**a** stands for ACL, and **x** for extended attributes.
+Complete details on the output format can be found in the **rsync**(1) manual.
+
 # SPECIAL REPOSITORIES
 
 A **detached** repository is one with the **yarsync** configuration directory
@@ -151,11 +493,13 @@ or move the existing configuration directory manually.
 For example, if one wants to have several versions of static Web pages,
 they may create a detached repository and publish the working directory
 without the Web server having access to the configuration.
-Commits can be created or checked out,
-but **pull** or **push** are not supported for such repositories
+Alternatively, if one really wants to have both a continuous synchronization
+and **yarsync** backups, they can move its configuration outside, if that will work.
+Commits in such repositories can be created or checked out,
+but **pull** or **push** are currently not supported
 (one will have to synchronize them manually).
 A detached repository is similar to a bare repository in git,
-but always has a working directory.
+but usually has a working directory.
 
 A repository with a **filter** can exclude (disable tracking) some files or directories
 from the working directory.
@@ -191,7 +535,7 @@ A simple configuration for a remote \"my\_remote\" could be:
     Several sections can be added for more remotes.
 An example (non-effective) configuration is created during **init**.
 Note that comments in **config.ini** can be erased
-during **remote {add,rm}**.
+during **remote** {**add**,**rm**}.
 
     Since removable media or remote hosts can change their paths
 or IP addresses, one may use variable substitution in paths:
@@ -222,6 +566,7 @@ For that, add a default section with an option **host_from_section_name**:
         host_from_section_name
 
     Empty lines and lines starting with \'**#**\' are ignored.
+Section names are case-sensitive.
 White spaces in a section name will be considered parts of its name.
 Spaces around \'**=**\' are allowed.
 Full syntax specification can be found at
@@ -238,7 +583,7 @@ for the repository replicas on different hosts or devices.
 For example, if one has repositories \"programming/\" and \"music/\"
 on a laptop \"my\_host\", their names would probably be \"my\_host\",
 and the names of their copies on an external drive could be \"my\_drive\"
-(this is different from git, which uses only author's name in logs).
+(this is different from git, which uses only the author's name in logs).
 If one never creates commits directly on \"my\_drive\",
 these names can be empty.
 
@@ -336,7 +681,7 @@ instead of creating file copies, test it with
     du -sh .
     du -sh .ys
 
-(can be run during **pull** or **clone** if it takes a long time).
+(can be run during **pull** or **clone** if they take too long).
 The results must be almost the same. If not, you may not use **yarsync**
 on this file system, have large deleted files stored in old commits
 or you may have subdirectories excluded with a **filter**
@@ -347,7 +692,6 @@ To test that a particular file \"a\" was hard linked to its committed versions, 
     ls -i a .ys/commits/*/a
 
 If all is correct, their inodes must be the same.
-To create a hard link, use **ln**(1).
 
 Hard links may be broken in a cloned git repository
 (as it happens with **yarsync** tests), because git does not preserve them.
@@ -359,7 +703,12 @@ To fix hard links for the whole repository, run **hardlink**(1) in its root.
 The yarsync page is <https://github.com/ynikitenko/yarsync>.
 
 # BUGS
-Some corner cases during **clone** are not handled
+Requires a filesystem with hard links,
+rsync version at least 3.1.0 (released 28 September 2013) and Python >= 3.6.
+
+Always do a **\--dry-run** before actual changes.
+
+Some corner cases are not fully handled yet
 and raise Python errors instead of correct return codes.
 The output messages deserve to be improved.
 Please be patient and please report any bugs or make feature requests to
