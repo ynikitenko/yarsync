@@ -822,6 +822,7 @@ class YARsync():
         # However, see no real usage for them.
         if commit is None:
             commit = int(self._args.commit)
+        # todo: improve verbosity handling
         verbose = True
 
         if commit not in self._get_local_commits():
@@ -853,13 +854,9 @@ class YARsync():
 
         if verbose:
             self._print_command(command_str)
-
-        sp = subprocess.Popen(command, stdout=subprocess.PIPE)
-
-        # todo: stderr?
-        # todo: verbose/quiet flags?
-        for line in iter(sp.stdout.readline, b''):
-            print(line.decode("utf-8"), end='')
+            sp = subprocess.run(command)
+        else:
+            sp = subprocess.run(command, stdout=subprocess.PIPE)
 
         if commit == self._get_last_commit():
             # remove HEADFILE
