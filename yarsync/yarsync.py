@@ -1171,7 +1171,7 @@ class YARsync():
         # self._print(" ".join(command), debug=True)
         completed_process = subprocess.Popen(
             command,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            stdout=subprocess.PIPE  #, stderr=subprocess.PIPE
         )
         stdoutdata, stderrdata = completed_process.communicate()
         returncode = completed_process.returncode
@@ -1620,13 +1620,22 @@ class YARsync():
                 "(removing all commits and logs missing on the destination)."
             )
 
-        self._print_command(command_str)
+        self._print_command(command_str, level=3)
 
-        completed_process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        stdoutdata, stderrdata = completed_process.communicate()
+        if self.print_level >= 3:
+            stdout = None
+        elif self.print_level == 2:
+            # todo: parse manually and group all commit messages into one
+            # Commits transferred: [..., ...]
+            # Note that "The data read is buffered in memory,
+            # so do not use this method
+            # if the data size is large or unlimited."
+            # https://docs.python.org/3/library/subprocess.html#subprocess.Popen.communicate
+            stdout = subprocess.PIPE
+        else:
+            stdout = subprocess.DEVNULL
+        completed_process = subprocess.Popen(command, stdout=stdout)
+        stdoutdata, _ = completed_process.communicate()
         returncode = completed_process.returncode
         if returncode:
             _print_error(
