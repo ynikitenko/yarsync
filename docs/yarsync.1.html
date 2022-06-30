@@ -5,7 +5,7 @@
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <meta name="author" content="Written by Yaroslav Nikitenko" />
-  <title>YARSYNC(1) yarsync 0.1 | YARsync Manual</title>
+  <title>YARsync 0.1 manual</title>
   <style>
     html {
       line-height: 1.5;
@@ -161,7 +161,7 @@
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">YARSYNC(1) yarsync 0.1</h1>
+<h1 class="title">YARsync 0.1 manual</h1>
 <p class="author">Written by Yaroslav Nikitenko</p>
 <p class="date">June 2022</p>
 </header>
@@ -800,10 +800,10 @@ exist by default, but can be added for flexibility.</p>
 his presentations in "tex/" in a separate repository. Instead of having
 a different directory "~/work_tex", he adds such rules to
 <strong>rsync-filter</strong>:</p>
-<pre><code>\# all are in git repositories
-\- /repos
-\# take care to sync separately
-\- /tex</code></pre>
+<pre><code># all are in git repositories
+- /repos
+# take care to sync separately
+- /tex</code></pre>
 <p>In this way, "~/work/tex" and contained git repositories will be
 excluded from "~/work" synchronization. Lines starting with
 '<strong>#</strong>' are ignored, as well as empty lines. To complicate
@@ -909,10 +909,9 @@ class="uri">https://github.com/ynikitenko/yarsync</a>.</p>
 <p>Requires a filesystem with hard links, rsync version at least 3.1.0
 (released 28 September 2013) and Python &gt;= 3.6.</p>
 <p>Always do a <strong>--dry-run</strong> before actual changes.</p>
-<p>Some corner cases are not fully handled yet and raise Python errors
-instead of correct return codes. The output messages deserve to be
-improved. Please be patient and please report any bugs or make feature
-requests to <a href="https://github.com/ynikitenko/yarsync/issues"
+<p>Occasionally Python errors are raised instead of correct return
+codes. Please report any bugs or make feature requests to <a
+href="https://github.com/ynikitenko/yarsync/issues"
 class="uri">https://github.com/ynikitenko/yarsync/issues</a>.</p>
 <h1 id="copyright">COPYRIGHT</h1>
 <p>Copyright © 2021-2022 Yaroslav Nikitenko. License GPLv3: GNU GPL

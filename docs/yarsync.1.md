@@ -601,10 +601,10 @@ but wants to keep his presentations in \"tex/\" in a separate repository.
 Instead of having a different directory \"~/work\_tex\", he adds such rules
 to **rsync-filter**:
 
-        \# all are in git repositories
-        \- /repos
-        \# take care to sync separately
-        \- /tex
+        # all are in git repositories
+        - /repos
+        # take care to sync separately
+        - /tex
 
     In this way, \"~/work/tex\" and contained git repositories will be excluded
 from \"~/work\" synchronization. Lines starting with \'**#**\' are ignored,
@@ -708,10 +708,8 @@ rsync version at least 3.1.0 (released 28 September 2013) and Python >= 3.6.
 
 Always do a **\--dry-run** before actual changes.
 
-Some corner cases are not fully handled yet
-and raise Python errors instead of correct return codes.
-The output messages deserve to be improved.
-Please be patient and please report any bugs or make feature requests to
+Occasionally Python errors are raised instead of correct return codes.
+Please report any bugs or make feature requests to
 <https://github.com/ynikitenko/yarsync/issues>.
 
 # COPYRIGHT

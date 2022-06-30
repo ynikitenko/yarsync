@@ -7,7 +7,7 @@ with open("README.rst", "r") as readme:
 
 setuptools.setup(
     name="yarsync",
-    version="0.1",
+    version="0.1.1",
     author="Yaroslav Nikitenko",
     author_email="metst13@gmail.com",
     description="Yet Another Rsync is a file synchronization and backup tool",

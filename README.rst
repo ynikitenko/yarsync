@@ -95,7 +95,7 @@ In particular, ``rsync`` can be found:
 * can be installed on `Windows <https://superuser.com/questions/300263/how-to-use-rsync-from-windows-pc-to-remote-linux-server>`_.
 
 ``yarsync`` runs successfully on Linux.
-Feel free to report to us if you have problems (or success) running it on your system.
+Please report to us if you have problems (or success) running it on your system.
 
 -------
 Safety
