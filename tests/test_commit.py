@@ -72,7 +72,7 @@ def test_commit(mocker):
         call(["rsync", "-a", "--link-dest=../../..", "--exclude=/.ys"]
              + filter_ +
              [ys.root_dir + '/', os.path.join(ys.COMMITDIR, "2_tmp")],
-             stdout=-1, stderr=-1),
+             stdout=-3),
         call().communicate(),
     ]
     assert m.mock_calls == [

@@ -858,6 +858,9 @@ class YARsync():
         else:
             sp = subprocess.run(command, stdout=subprocess.PIPE)
 
+        # we don't check for error code here,
+        # because if checkout was wrong, we can't be sure
+        # in the resulting state.
         if commit == self._get_last_commit():
             # remove HEADFILE
             self._update_head()
@@ -942,24 +945,25 @@ class YARsync():
         full_command_str += " " + root_dir + " " + commit_dir_tmp
 
         self._print_command(full_command_str)
-        # self._print("command =", command, debug=True)
-        completed_process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        # The data read is buffered in memory,
-        # so do not use this method
-        # if the data size is large or unlimited.
-        # https://docs.python.org/2/library/subprocess.html?highlight=subprocess#subprocess.Popen.communicate
-        stdoutdata, stderrdata = completed_process.communicate()
+        if self.print_level >= 3:
+            # with run there will be problems during testing
+            completed_process = subprocess.Popen(command)
+        else:
+            completed_process = subprocess.Popen(
+                command, stdout=subprocess.DEVNULL
+            )
+        completed_process.communicate()
         returncode = completed_process.returncode
         if returncode:
+            # if the run was not verbose enough, we won't see stdout.
+            # Make a more verbose commit then.
             _print_error("an error occurred during hard linking, "
                          "rsync returned {}".format(returncode))
             return returncode
 
         # commit is done
-        self._print_command("mv {} {}".format(commit_dir_tmp, commit_dir))
+        self._print_command("mv {} {}".format(commit_dir_tmp, commit_dir),
+                            level=3)
         os.rename(commit_dir_tmp, commit_dir)
 
         ## log ##
