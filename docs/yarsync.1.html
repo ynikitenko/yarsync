@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Written by Yaroslav Nikitenko" />
+  <title>YARSYNC(1) yarsync 0.1 | YARsync Manual</title>
+  <style>
+    html {
+      line-height: 1.5;
+      font-family: Georgia, serif;
+      font-size: 20px;
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 1em;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, 'Lucida Console', Consolas, monospace;
+      font-size: 85%;
+      margin: 0;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">YARSYNC(1) yarsync 0.1</h1>
+<p class="author">Written by Yaroslav Nikitenko</p>
+<p class="date">June 2022</p>
+</header>
+<h1 id="name">NAME</h1>
+<p>Yet Another Rsync is a file synchronization and backup tool</p>
+<h1 id="synopsis">SYNOPSIS</h1>
+<p><strong>yarsync</strong> [<strong>-h</strong>]
+[<strong>--config-dir</strong> <em>DIR</em>]
+[<strong>--root-dir</strong> <em>DIR</em>] [<strong>-q</strong> |
+<strong>-v</strong>] <em>command</em> [<em>args</em>]</p>
+<h1 id="description">DESCRIPTION</h1>
+<p><strong>yarsync</strong> is a wrapper around rsync to store its
+configuration and synchronize repositories with the interface similar to
+git. It is <em>efficient</em> (files in the repository can be removed
+and renamed freely without additional transfers), <em>distributed</em>
+(several replicas of the repository can diverge, and in that case a
+manual merge is supported), <em>safe</em> (it takes care to prevent data
+loss and corruption) and <em>simple</em> (see this manual).</p>
+<h1 id="quick-start">QUICK START</h1>
+<p>To create a new repository, enter the directory with its files and
+type</p>
+<pre><code>yarsync init</code></pre>
+<p>This operation is safe and will not affect existing files (including
+configuration files in an existing repository). Alternatively, run
+<strong>init</strong> inside an empty directory and add files
+afterwards. To complete the initialization, make a commit:</p>
+<pre><code>yarsync commit -m &quot;Initial commit&quot;</code></pre>
+<p><strong>commit</strong> creates a snapshot of the working directory,
+which is all files in the repository except <strong>yarsync</strong>
+configuration and data. This snapshot is very small, because it uses
+hard links. To check how much your directory size has changed, run
+<strong>du</strong>(1).</p>
+<p>Commit name is the number of seconds since the Epoch (integer Unix
+time). This allows commits to be ordered in time, even for hosts in
+different zones. Though this works on most Unix systems and Windows, the
+epoch is platform dependent.</p>
+<p>After creating a commit, files can be renamed, deleted or added. To
+see what was changed since the last commit, use <strong>status</strong>.
+To see the history of existing commits, use <strong>log</strong>.</p>
+<p>Hard links are excellent at tracking file moves or renames and
+storing accidentally removed files. Their downside is that if a file
+gets corrupt, this will apply to all of its copies in local commits. The
+3-2-1 backup rule implies that one should have at least 3 copies of
+data, so let us add a remote repository "my_remote":</p>
+<pre><code>yarsync remote add my_remote remote:/path/on/my/remote</code></pre>
+<p>For local copies we still call the repositories "remote", but their
+paths will be local:</p>
+<pre><code>yarsync remote add my_drive /mnt/my_drive/my_repo</code></pre>
+<p>This command only updated our configuration, but did not make any
+changes at the remote path (which may not exist). To make a local copy
+of our repository, run</p>
+<pre><code>yarsync clone . /mnt/my_drive/my_repo</code></pre>
+<p><strong>clone</strong> copies all repository data (except the
+configuration) to the new replica and adds the original repository to
+its remotes with the name "origin". To copy the repository to a remote
+host, just copy its files (preserving hard links):</p>
+<pre><code>rsync -avHP ./ remote:/path/on/my/remote</code></pre>
+<p>Here '<strong>-H</strong>' stands for hard links. If the first path
+ends with a slash, data will be copied to "remote/", otherwise to its
+subdirectory. Similarly, one can copy a repository <em>from</em> a
+remote: just change the order of paths and don’t forget about the slash.
+To check that we set up the repositories correctly, make a dry run with
+'<strong>-n</strong>':</p>
+<pre><code>yarsync push -n my_remote</code></pre>
+<p>If there are no errors and no file transfers, then we have a
+functioning remote. We can continue working locally, adding and removing
+files and making commits. When we want to synchronize repositories, we
+<strong>push</strong> the changes <em>to</em> or <strong>pull</strong>
+them <em>from</em> a remote (first with a <strong>--dry-run</strong>).
+This is the recommended workflow, and if we work on different
+repositories in sequence and always synchronize changes, our life will
+be easy. Sometimes, however, we may forget to synchronize two replicas
+and they will end up in a diverged state; we may actually change some
+files or find them corrupt. Solutions to these problems involve user
+decisions and are described in <strong>pull</strong> and
+<strong>push</strong> options.</p>
+<h1 id="option-summary">OPTION SUMMARY</h1>
+<table>
+<colgroup>
+<col style="width: 26%" />
+<col style="width: 73%" />
+</colgroup>
+<tbody>
+<tr class="odd">
+<td>--help, -h</td>
+<td>show help message and exit</td>
+</tr>
+<tr class="even">
+<td>--config-dir=DIR</td>
+<td>path to the configuration directory</td>
+</tr>
+<tr class="odd">
+<td>--root-dir=DIR</td>
+<td>path to the root of the working directory</td>
+</tr>
+<tr class="even">
+<td>--quiet, -q</td>
+<td>decrease verbosity</td>
+</tr>
+<tr class="odd">
+<td>--verbose, -v</td>
+<td>increase verbosity</td>
+</tr>
+</tbody>
+</table>
+<h1 id="command-summary">COMMAND SUMMARY</h1>
+<table>
+<colgroup>
+<col style="width: 18%" />
+<col style="width: 81%" />
+</colgroup>
+<tbody>
+<tr class="odd">
+<td></td>
+<td></td>
+</tr>
+<tr class="even">
+<td><strong>checkout</strong></td>
+<td>restore the working directory to a commit</td>
+</tr>
+<tr class="odd">
+<td><strong>clone</strong></td>
+<td>clone a repository into a new directory</td>
+</tr>
+<tr class="even">
+<td><strong>commit</strong></td>
+<td>commit the working directory</td>
+</tr>
+<tr class="odd">
+<td><strong>diff</strong></td>
+<td>print the difference between two commits</td>
+</tr>
+<tr class="even">
+<td><strong>init</strong></td>
+<td>initialize a repository</td>
+</tr>
+<tr class="odd">
+<td><strong>log</strong></td>
+<td>print commit logs</td>
+</tr>
+<tr class="even">
+<td><strong>pull</strong></td>
+<td>get data from a source</td>
+</tr>
+<tr class="odd">
+<td><strong>push</strong></td>
+<td>send data to a destination</td>
+</tr>
+<tr class="even">
+<td><strong>remote</strong></td>
+<td>manage remote repositories</td>
+</tr>
+<tr class="odd">
+<td><strong>show</strong></td>
+<td>print log messages and actual changes for commit(s)</td>
+</tr>
+<tr class="even">
+<td><strong>status</strong></td>
+<td>print updates since last commit</td>
+</tr>
+</tbody>
+</table>
+<h1 id="options">OPTIONS</h1>
+<dl>
+<dt><strong>--help</strong>, <strong>-h</strong></dt>
+<dd>
+Prints help message and exits. Default if no arguments are given. After
+a command name, prints help for that command.
+</dd>
+<dt><strong>--config-dir=DIR</strong></dt>
+<dd>
+Provides the path to the configuration directory if it is detached. Both
+<strong>--config-dir</strong> and <strong>--root-dir</strong> support
+tilde expansion for user’s home directory. See SPECIAL REPOSITORIES for
+usage details.
+</dd>
+<dt><strong>--root-dir=DIR</strong></dt>
+<dd>
+Provides the path to the root of the working directory for a detached
+repository. Requires <strong>--config-dir</strong>. If not set
+explicitly, the default working directory is the current one.
+</dd>
+<dt><strong>--quiet</strong>, <strong>-q</strong></dt>
+<dd>
+Decreases verbosity. Does not affect error messages (redirect them if
+needed).
+</dd>
+<dt><strong>--verbose</strong>, <strong>-v</strong></dt>
+<dd>
+Increases verbosity. May print more rsync commands and output. Conflicts
+with <strong>--quiet</strong>.
+</dd>
+</dl>
+<h1 id="commands">COMMANDS</h1>
+<p>All commands support the <strong>--help</strong> option. Commands
+that can change the repository also support the
+<strong>--dry-run</strong> option.</p>
+<dl>
+<dt><strong>--dry-run</strong>, <strong>-n</strong></dt>
+<dd>
+Prints what will be transferred during a real run, but does not make any
+changes.
+</dd>
+<dt><strong>--help</strong>, <strong>-h</strong></dt>
+<dd>
+Prints help for a command or a subcommand.
+</dd>
+</dl>
+<h1 id="checkout">checkout</h1>
+<p><strong>yarsync checkout</strong> [<strong>-h</strong>]
+[<strong>-n</strong>] <em>commit</em></p>
+<p>Restores the working directory to its state during <em>commit</em>.
+WARNING: this will overwrite the working directory. Make sure that all
+important data is committed. Make a dry run first with
+<strong>-n</strong>.</p>
+<p>If not the most recent commit was checked out, the repository HEAD
+(in git terminology, see <strong>git-checkout</strong>(1)) becomes
+detached, which prevents such operations as <strong>pull</strong> or
+<strong>push</strong>. To advance the repository to its correct state,
+check out the last commit or make a new one.</p>
+<dl>
+<dt><em>commit</em></dt>
+<dd>
+The commit name (as printed in <strong>log</strong> or during
+<strong>commit</strong>).
+</dd>
+</dl>
+<h1 id="clone">clone</h1>
+<p><strong>yarsync clone</strong> [<strong>-h</strong>]
+[<strong>-o</strong> <em>origin</em>] [<strong>-n</strong>
+<em>clone</em>] <em>repository</em> <em>directory</em></p>
+<p>Clones a <em>repository</em> to a <em>directory</em>. Non-existent
+paths will be created. Non-empty directories will be unchanged (and an
+error will be issued).</p>
+<p>Note that only data (working directory, commits and logs, not
+configuration files) will be cloned. This command will refuse to clone a
+repository with a filter (see SPECIAL REPOSITORIES).</p>
+<h3 id="positional-arguments">Positional arguments</h3>
+<dl>
+<dt><em>repository</em></dt>
+<dd>
+A path to the source repository (local or remote).
+</dd>
+<dt><em>directory</em></dt>
+<dd>
+A path to the cloned local repository. If <em>directory</em> ends with a
+'<strong>/</strong>', the new repository will be created as its
+subdirectory with the name taken from the last part of the repository
+path.
+</dd>
+</dl>
+<h3 id="options-1">Options</h3>
+<dl>
+<dt><strong>--origin</strong>=<em>origin</em>, <strong>-o</strong></dt>
+<dd>
+Name of the remote repository for the cloned one (by default "origin").
+</dd>
+<dt><strong>--name</strong>=<em>clone</em>, <strong>-n</strong></dt>
+<dd>
+Name of the new repository (as it could be named during
+<strong>init</strong>).
+</dd>
+</dl>
+<h1 id="commit">commit</h1>
+<p><strong>yarsync commit</strong> [<strong>-h</strong>]
+[<strong>-m</strong> <em>message</em>]</p>
+<p>Commits the working directory (makes its snapshot). See QUICK START
+for more details on commits.</p>
+<dl>
+<dt><em>message</em></dt>
+<dd>
+Commit message (used in logs). Can be empty.
+</dd>
+</dl>
+<h1 id="diff">diff</h1>
+<p><strong>yarsync diff</strong> [<strong>-h</strong>] <em>commit</em>
+[<em>commit</em>]</p>
+<p>Prints the difference between two commits (from old to the new one,
+the order of arguments is unimportant). If the second commit is omitted,
+compares <em>commit</em> to the most recent one. See
+<strong>status</strong> for the output format.</p>
+<dl>
+<dt><em>commit</em></dt>
+<dd>
+Commit name.
+</dd>
+</dl>
+<h1 id="init">init</h1>
+<p><strong>yarsync init</strong> [<strong>-h</strong>]
+[<em>reponame</em>]</p>
+<p>Initializes a <strong>yarsync</strong> repository in the current
+directory. Creates a configuration folder with repository files.
+Existing configuration and files in the working directory are unchanged.
+Create a first commit for the repository to become fully
+operational.</p>
+<dl>
+<dt><em>reponame</em></dt>
+<dd>
+Name of the repository (logged during commits).
+</dd>
+</dl>
+<h1 id="log">log</h1>
+<p><strong>yarsync log</strong> [<strong>-h</strong>]
+[<strong>-n</strong> <em>number</em>] [<strong>-r</strong>]</p>
+<p>Prints commit logs (from newest to oldest), as well as
+synchronization information when it is available. To see changes in the
+working directory, use <strong>status</strong>.</p>
+<h3 id="options-2">Options</h3>
+<dl>
+<dt><strong>--max-count</strong>=<em>number</em>,
+<strong>-n</strong></dt>
+<dd>
+Maximum number of logs shown.
+</dd>
+<dt><strong>--reverse</strong>, <strong>-r</strong></dt>
+<dd>
+Reverse log order.
+</dd>
+</dl>
+<h3 id="example">Example</h3>
+<p>To print information about the three most recent commits, use</p>
+<pre><code>yarsync log -n 3</code></pre>
+<h1 id="pull">pull</h1>
+<p><strong>yarsync pull</strong> [<strong>-h</strong>]
+[<strong>-f</strong> | <strong>--new</strong> | <strong>-b</strong> |
+<strong>--backup-dir</strong> <em>DIR</em>] [<strong>-n</strong>]
+[<strong>--overwrite</strong>] <em>source</em></p>
+<p>Gets data from a remote <em>source</em>. The difference between
+<strong>pull</strong> and <strong>push</strong> is mostly only the
+direction of transfer.</p>
+<p><strong>pull</strong> and <strong>push</strong> bring two
+repositories into the same state. They synchronize the working
+directory, that is they add to the destination new files from source,
+remove those missing on source and do all renames and moves of
+previously committed files efficiently. This is done in one run, and
+these changes apply also to logs and commits. In most cases, we do not
+want our existing logs and commits to be removed though. By default,
+several checks are made to prevent data loss:</p>
+<pre><code>- local has no uncommitted changes,
+- local has not a detached HEAD,
+- local is not in a merging state,
+- destination has no commits missing on source.</code></pre>
+<p>If any of these cases is in effect, no modifications will be made.
+Note that the remote may have uncommitted changes itself: always make a
+dry run with <strong>-n</strong> first!</p>
+<p>To commit local changes to the repository, use
+<strong>commit</strong>. HEAD commit could be changed during
+<strong>checkout</strong> (see its section for the solutions). If the
+destination has commits missing on source, there are two options: to
+<strong>--force</strong> changes to the destination (removing these
+commits) or to merge changes inside the local repository with
+<strong>pull --new</strong>.</p>
+<p>If we pull new commits from the remote, this will bring repository
+into a merging state. Merge will be done automatically if the last
+remote commit is among local ones (in that case only some older commits
+were transferred from there). If some recent remote commits are not
+present locally, however, this means that histories of the repositories
+diverged, and we will need to merge them manually. After we have all
+local and remote commits and the union of the working directories in our
+local repository, we can safely choose the easiest way for us to merge
+them. To see the changes, use <strong>status</strong> and
+<strong>log</strong>. For example, if we added a file in a
+<em>remote_commit</em> before and it was added now, we can just
+<strong>commit</strong> the changes. If we have made many local changes,
+renames and removals since then, we may better <strong>checkout</strong>
+our latest commit (remember that all files from the working directory
+are present in commits, so it is always safe) and link the new file to
+the working directory:</p>
+<pre><code>ln .ys/commits/&lt;remote_commit&gt;/path/to/file .</code></pre>
+<p>(it can be moved to its subdirectory without the risk of breaking
+hard links). If the remote commit was actually large, and local changes
+were recent but small, then we shall check out the remote commit and
+apply local changes by hand. After our working directory is in the
+desired state, we <strong>commit</strong> changes and the merge is
+finished. The result shall be pushed to the remote without problems.</p>
+<h3 id="pull-options">pull options</h3>
+<dl>
+<dt><strong>--new</strong></dt>
+<dd>
+<p>Do not remove local data that is missing on <em>source</em>. While
+this option can return deleted or moved files back to the working
+directory, it also adds remote logs and commits that were missing here
+(for example, old or unsynchronized commits). A forced
+<strong>push</strong> to the remote could remove these logs and commits,
+and this option allows one to <strong>pull</strong> them first to the
+local repository.</p>
+<p>After <strong>pull --new</strong> the local repository can enter a
+merging state. See <strong>pull</strong> description for more
+details.</p>
+</dd>
+<dt><strong>--backup</strong>, <strong>-b</strong></dt>
+<dd>
+Changed files in the working directory are renamed (appended with
+'<strong>~</strong>'). See <strong>--backup-dir</strong> for more
+details.
+</dd>
+<dt><strong>--backup-dir</strong> <em>DIR</em></dt>
+<dd>
+<p>Changed local files are put into a directory <em>DIR</em> preserving
+their relative paths. <em>DIR</em> can be an absolute path or relative
+to the root of the repository. In contrast to <strong>--backup</strong>,
+<strong>--backup-dir</strong> does not change resulting file names.</p>
+<p>This option is convenient for large file trees, because it recreates
+the existing file structure of the repository (one doesn’t have to
+search for new backup files in all subdirectories). For current rsync
+version, the command</p>
+<pre><code>yarsync pull --backup-dir BACKUP &lt;remote&gt;</code></pre>
+<p>will copy updated files from the remote and put them into the
+directory "BACKUP/BACKUP" (this is how rsync works). To reduce
+confusion, make standard <strong>pull</strong> first (so that during the
+backup there are only file updates).</p>
+<p>This option is available only for <strong>pull</strong>, because it
+is assumed that the user will apply local file changes after backup. For
+example, suppose that after a <strong>pull --backup</strong> one gets
+files <em>a</em> and <em>a~</em> in the working directory. One should
+first see, which version is correct. If it is the local file
+<em>a~</em>, then the backup can be removed:</p>
+<pre><code>mv a~ a*</code></pre>
+<p>By local we mean the one hard linked with local commits (run <em>ls
+-i</em> to be sure). If the remote version is correct though, you need
+first to overwrite the local version not breaking the hard links. This
+can be done with an rsync option "--inplace":</p>
+<pre><code>rsync --inplace a a~
+mv a~ a
+# check file contents and the links
+ls -i a .ys/commits/*/a</code></pre>
+<p>For a <strong>--backup-dir</strong> and for longer paths these
+commands will be longer. Finally, if you need several versions, just
+save one of the files under a different name in the repository.</p>
+<p>After you have fixed all corrupt files, push them back to the remote.
+See the <strong>--overwrite</strong> option for propagation of file
+changes.</p>
+</dd>
+</dl>
+<h3 id="pull-and-push-options">pull and push options</h3>
+<dl>
+<dt><strong>--force</strong>, <strong>-f</strong></dt>
+<dd>
+Updates the working directory, removing commits and logs missing on
+source. This command brings two repositories to the nearest possible
+states: their working directories, commits and logs become the same.
+While working directories are always identical after
+<strong>pull</strong> or <strong>push</strong> (except for some of the
+<strong>pull</strong> options), <strong>yarsync</strong> generally
+refuses to remove existing commits or logs - unless this option is
+given. Use it if the destination has really unneeded commits or just
+remove them manually (see FILES for details on the commit directory).
+See also <strong>pull --new</strong> on how to fetch missing commits and
+<strong>--overwrite</strong> on synchronizing file contents.
+</dd>
+<dt><strong>--overwrite</strong></dt>
+<dd>
+Propagates file changes. By default, files in a <strong>yarsync</strong>
+repository are not changed, therefore actual changes are not transferred
+to other repositories to prevent file corruption. If you are confident
+that the local files for <strong>push</strong> (or remote ones for
+<strong>pull</strong>) are correct (for example, you just repaired them
+with the <strong>--backup</strong> options), you can synchronize changes
+with this option.
+</dd>
+</dl>
+<h1 id="push">push</h1>
+<p><strong>yarsync push</strong> [<strong>-h</strong>]
+[<strong>-f</strong>] [<strong>-n</strong>]
+[<strong>--overwrite</strong>] <em>destination</em></p>
+<p>Sends data to a remote <em>destination</em>. See
+<strong>pull</strong> for more details and common options.</p>
+<h1 id="remote">remote</h1>
+<p><strong>yarsync remote</strong> [<strong>-h</strong>]
+[<strong>-v</strong>] [<em>command</em>]</p>
+<p>Manages remote repositories configuration. By default, prints
+existing remotes. For more options, see <em>.ys/config.ini</em> in the
+FILES section.</p>
+<dl>
+<dt><strong>-v</strong></dt>
+<dd>
+Verbose. Prints remote paths as well.
+</dd>
+</dl>
+<h3 id="add"><strong>add</strong></h3>
+<p><strong>yarsync remote add</strong> [<strong>-h</strong>]
+<em>repository</em> <em>path</em></p>
+<p>Adds a new remote. <em>repository</em> is the name of the remote in
+local <strong>yarsync</strong> configuration (as it will be used later
+during <strong>pull</strong> or <strong>push</strong>). <em>path</em>
+has a standard form [user@]host:[path] for an actually remote host or it
+can be a local path. Since <strong>yarsync</strong> commands can be
+called from any subdirectory, local path should be absolute. Tilde for
+user’s home directory '<strong>~</strong>' in paths is allowed.</p>
+<h3 id="rm">rm</h3>
+<p><strong>yarsync remote rm</strong> [<strong>-h</strong>]
+<em>repository</em></p>
+<p>Removes an existing <em>repository</em> from local configuration.</p>
+<h3 id="show">show</h3>
+<p>Prints remote repositories. Default.</p>
+<h1 id="show-1">show</h1>
+<p><strong>yarsync show</strong> [<strong>-h</strong>] <em>commit</em>
+[<em>commit</em> …]</p>
+<p>Prints log messages and actual changes for commit(s). Changes are
+shown compared to the commit before <em>commit</em>. For the output
+format, see <strong>status</strong>. Information for several commits can
+be requested as well.</p>
+<dl>
+<dt><em>commit</em></dt>
+<dd>
+Commit name.
+</dd>
+</dl>
+<h1 id="status">status</h1>
+<p><strong>yarsync status</strong> [<strong>-h</strong>]</p>
+<p>Prints working directory updates since the last commit and the
+repository status. If there were no errors, this command always returns
+success (irrespective of uncommitted changes).</p>
+<h3 id="output-format-of-the-updates">Output format of the updates</h3>
+<p>The output for the updates is a list of changes, including attribute
+changes, and is based on the format of <em>rsync --itemize-changes</em>.
+For example, a line</p>
+<pre><code>.d..t...... programming/</code></pre>
+<p>means that the modification time '<em>t</em>' of the directory
+'<em>d</em>' <em>programming/</em> in the root of the repository has
+changed (files were added or removed from that). All its other
+attributes are unchanged ('.').</p>
+<p>The output is an 11-letter string of the format "YXcstpoguax", where
+'Y' is the update type, 'X' is the file type, and the other letters
+represent attributes that are printed if they were changed. For a newly
+created file these would be '+', like</p>
+<pre><code>&gt;f+++++++++ /path/to/file</code></pre>
+<p>The attribute letters are: <strong>c</strong>hecksum,
+<strong>s</strong>ize, modification <strong>t</strong>ime,
+<strong>p</strong>ermissions, <strong>o</strong>wner and
+<strong>g</strong>roup. <strong>u</strong> can be in fact
+<strong>u</strong>se (access) or creatio<strong>n</strong> time, or
+<strong>b</strong>oth. <strong>a</strong> stands for ACL, and
+<strong>x</strong> for extended attributes. Complete details on the
+output format can be found in the <strong>rsync</strong>(1) manual.</p>
+<h1 id="special-repositories">SPECIAL REPOSITORIES</h1>
+<p>A <strong>detached</strong> repository is one with the
+<strong>yarsync</strong> configuration directory outside the working
+directory. To use such repository, one must provide
+<strong>yarsync</strong> options <strong>--config-dir</strong> and
+<strong>--root-dir</strong> with every command
+(<strong>alias</strong>(1p) may be of help). To create a detached
+repository, use <strong>init</strong> with these options or move the
+existing configuration directory manually. For example, if one wants to
+have several versions of static Web pages, they may create a detached
+repository and publish the working directory without the Web server
+having access to the configuration. Alternatively, if one really wants
+to have both a continuous synchronization and <strong>yarsync</strong>
+backups, they can move its configuration outside, if that will work.
+Commits in such repositories can be created or checked out, but
+<strong>pull</strong> or <strong>push</strong> are currently not
+supported (one will have to synchronize them manually). A detached
+repository is similar to a bare repository in git, but usually has a
+working directory.</p>
+<p>A repository with a <strong>filter</strong> can exclude (disable
+tracking) some files or directories from the working directory. This may
+be convenient, but makes synchronization less reliable, and such
+repository can not be used as a remote. See
+<strong>rsync-filter</strong> in the FILES section for more details.</p>
+<h1 id="files">FILES</h1>
+<p>All <strong>yarsync</strong> repository configuration and data is
+stored in the hidden directory <strong>.ys</strong> under the root of
+the working directory. If the user no longer wants to use
+<strong>yarsync</strong> and the working directory is in the desired
+state, they can safely remove the <strong>.ys</strong> directory.</p>
+<p>Note that only commits and logs (apart from the working directory)
+are synchronized between the repositories. Each repository has its own
+configuration and name.</p>
+<h2 id="user-configuration-files">User configuration files</h2>
+<dl>
+<dt><strong>.ys/config.ini</strong></dt>
+<dd>
+<p>Contains names and paths of remote repositories. This file can be
+edited directly or with <strong>remote</strong> commands according to
+user’s preference.</p>
+<p><strong>yarsync</strong> supports synchronization with only existing
+remotes. A simple configuration for a remote "my_remote" could be:</p>
+<pre><code>[my_remote]
+path = remote:/path/on/my/remote</code></pre>
+<p>Several sections can be added for more remotes. An example
+(non-effective) configuration is created during <strong>init</strong>.
+Note that comments in <strong>config.ini</strong> can be erased during
+<strong>remote</strong> {<strong>add</strong>,<strong>rm</strong>}.</p>
+<p>Since removable media or remote hosts can change their paths or IP
+addresses, one may use variable substitution in paths:</p>
+<pre><code>[my_drive]
+path = $MY_DRIVE/my_repo</code></pre>
+<p>For the substitutions to take the effect, export these variables
+before run:</p>
+<pre><code>$ export MY_DRIVE=/run/media/my_drive
+$ yarsync push -n my_drive</code></pre>
+<p>If we made a mistake in the variable or path, it will be shown in the
+printed command. Always use <strong>--dry-run</strong> first to ensure
+proper synchronization.</p>
+<p>Another <strong>yarsync</strong> remote configuration option is
+<strong>host</strong>. If both <strong>path</strong> and
+<strong>host</strong> are present, the effective path will be their
+concatenation "&lt;host&gt;:&lt;path&gt;". Empty <strong>host</strong>
+means local host and does not prepend the path.</p>
+<p>It is possible to set default <strong>host</strong> for each section
+from the section name. For that, add a default section with an option
+<strong>host_from_section_name</strong>:</p>
+<pre><code>[DEFAULT]
+host_from_section_name</code></pre>
+<p>Empty lines and lines starting with '<strong>#</strong>' are ignored.
+Section names are case-sensitive. White spaces in a section name will be
+considered parts of its name. Spaces around '<strong>=</strong>' are
+allowed. Full syntax specification can be found at <a
+href="https://docs.python.org/3/library/configparser.html"
+class="uri">https://docs.python.org/3/library/configparser.html</a>.</p>
+</dd>
+<dt><strong>.ys/repository.txt</strong></dt>
+<dd>
+<p>Contains the repository name, which is used in logs and usually
+coincides with the remote name (how local repository is called on
+remotes). The name can be set during <strong>init</strong> or edited
+later.</p>
+<p>It is recommended (but not required) to have different names for the
+repository replicas on different hosts or devices. For example, if one
+has repositories "programming/" and "music/" on a laptop "my_host",
+their names would probably be "my_host", and the names of their copies
+on an external drive could be "my_drive" (this is different from git,
+which uses only the author’s name in logs). If one never creates commits
+directly on "my_drive", these names can be empty.</p>
+<p>If the repository name is missing (empty or no file), host name will
+be used. If there is an error getting the host name during
+<strong>commit</strong>, provide the name in the
+<strong>repository.txt</strong>.</p>
+</dd>
+<dt><strong>.ys/rsync-filter</strong></dt>
+<dd>
+<p>Contains rsync filter rules, which effectively define what data
+belongs to the repository. The <strong>rsync-filter</strong> does not
+exist by default, but can be added for flexibility.</p>
+<p>For example, the author has a repository "~/work", but wants to keep
+his presentations in "tex/" in a separate repository. Instead of having
+a different directory "~/work_tex", he adds such rules to
+<strong>rsync-filter</strong>:</p>
+<pre><code>\# all are in git repositories
+\- /repos
+\# take care to sync separately
+\- /tex</code></pre>
+<p>In this way, "~/work/tex" and contained git repositories will be
+excluded from "~/work" synchronization. Lines starting with
+'<strong>#</strong>' are ignored, as well as empty lines. To complicate
+things, one can include a subdirectory of "tex" into "work" with an
+include filter '<strong>+</strong>'. For complete details, see FILTER
+RULES section of <strong>rsync</strong>(1).</p>
+<p>While convenient for everyday use, filters make backup more
+difficult. To synchronize repository with them, one has to remember that
+it has subdirectories that need to be synchronized too. If the remote
+repository had its own filters, that would make synchronization even
+more unreliable. Therefore filters are generally discouraged:
+<strong>pull</strong> and <strong>push</strong> ignore remote filters
+(make sure you synchronize only <em>from</em> a repository with
+filters), while <strong>clone</strong> refuses to copy a repository with
+<strong>rsync-filter</strong>.</p>
+</dd>
+</dl>
+<h2 id="yarsync-technical-directories">yarsync technical
+directories</h2>
+<dl>
+<dt><strong>.ys/commits/</strong></dt>
+<dd>
+Contains local commits (snapshots of the working directory). If some of
+the old commits are no longer needed (there are too many of them or they
+contain a large file), they can be removed. Make sure, however, that all
+remote repositories contain at least some of the present commits,
+otherwise future synchronization will get complicated. Alternatively,
+remove unneeded files or folders manually: commits can be edited, with
+care taken to synchronize them correctly.
+</dd>
+<dt><strong>.ys/logs/</strong></dt>
+<dd>
+Contains text logs produced during <strong>commit</strong>. They are not
+necessary, so removing any of them will not break the repository. If one
+wants to fix or improve a commit message though, they may edit the
+corresponding log (the change will be propagated during
+<strong>push</strong> with the <strong>--overwrite</strong> option). It
+is recommended to store logs even for old deleted commits, which may be
+present on formerly used devices.
+</dd>
+</dl>
+<h1 id="exit-status">EXIT STATUS</h1>
+<dl>
+<dt><strong>0</strong></dt>
+<dd>
+Success
+</dd>
+<dt><strong>1</strong></dt>
+<dd>
+Invalid option
+</dd>
+<dt><strong>7</strong></dt>
+<dd>
+Configuration error
+</dd>
+<dt><strong>8</strong></dt>
+<dd>
+Command error
+</dd>
+<dt><strong>9</strong></dt>
+<dd>
+System error
+</dd>
+</dl>
+<p>If the command could be run successfully, a zero code is returned.
+Invalid option code is returned for mistakes in command line argument
+syntax. Configuration error can occur when we are outside an existing
+repository or a <strong>yarsync</strong> configuration file is missing.
+If the repository is correct, but the command is not allowed in its
+current state (for example, one can not push or pull when there are
+uncommitted changes or add a remote with an already present name), the
+command error is returned. It is also possible that a general system
+error, such as a keyboard interrupt, is raised in the Python
+interpreter.</p>
+<p>In case of rsync errors, its error code is returned.</p>
+<h1 id="diagnostics">DIAGNOSTICS</h1>
+<p>To check that your clocks (used for properly ordering commits) at
+different hosts are synchronized well enough, run</p>
+<pre><code>python -c &#39;import time; print(time.time())&#39;</code></pre>
+<p>To make sure that the local repository supports hard links instead of
+creating file copies, test it with</p>
+<pre><code>du -sh .
+du -sh .ys</code></pre>
+<p>(can be run during <strong>pull</strong> or <strong>clone</strong> if
+they take too long). The results must be almost the same. If not, you
+may not use <strong>yarsync</strong> on this file system, have large
+deleted files stored in old commits or you may have subdirectories
+excluded with a <strong>filter</strong> (see SPECIAL REPOSITORIES
+section).</p>
+<p>To test that a particular file "a" was hard linked to its committed
+versions, run</p>
+<pre><code>ls -i a .ys/commits/*/a</code></pre>
+<p>If all is correct, their inodes must be the same.</p>
+<p>Hard links may be broken in a cloned git repository (as it happens
+with <strong>yarsync</strong> tests), because git does not preserve
+them. To fix hard links for the whole repository, run
+<strong>hardlink</strong>(1) in its root.</p>
+<h1 id="see-also">SEE ALSO</h1>
+<p><strong>rsync</strong>(1)</p>
+<p>The yarsync page is <a href="https://github.com/ynikitenko/yarsync"
+class="uri">https://github.com/ynikitenko/yarsync</a>.</p>
+<h1 id="bugs">BUGS</h1>
+<p>Requires a filesystem with hard links, rsync version at least 3.1.0
+(released 28 September 2013) and Python &gt;= 3.6.</p>
+<p>Always do a <strong>--dry-run</strong> before actual changes.</p>
+<p>Some corner cases are not fully handled yet and raise Python errors
+instead of correct return codes. The output messages deserve to be
+improved. Please be patient and please report any bugs or make feature
+requests to <a href="https://github.com/ynikitenko/yarsync/issues"
+class="uri">https://github.com/ynikitenko/yarsync/issues</a>.</p>
+<h1 id="copyright">COPYRIGHT</h1>
+<p>Copyright © 2021-2022 Yaroslav Nikitenko. License GPLv3: GNU GPL
+version 3 <a href="https://gnu.org/licenses/gpl.html"
+class="uri">https://gnu.org/licenses/gpl.html</a>.<br />
+This is free software: you are free to change and redistribute it. There
+is NO WARRANTY, to the extent permitted by law.</p>
+</body>
+</html>

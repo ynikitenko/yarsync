@@ -1,3 +1,18 @@
+YARsync 0.1.1
+===========================
+YARsync patch release 0.1.1 was made on 30 June 2022.
+It adds a manual page, improves output and supports Python 3.6.
+
+Improvements
+------------
+Tested and works for Python 3.6.
+Improves output handling in commit (allows verbosity settings).
+rsync always outputs error messages.
+
+Bug fixes
+---------
+pull and push print output correctly.
+
 =======================
   YARsync release 0.1
 =======================
