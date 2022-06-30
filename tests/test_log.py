@@ -2,6 +2,7 @@
 import os
 import pytest
 import sys
+import time
 
 from yarsync import YARsync
 from .settings import TEST_DIR, TEST_DIR_EMPTY
@@ -47,6 +48,16 @@ def test_log(mocker):
     res = ys()
     call = mocker.call
     assert res == 0
+
+    # the date on Python 3.6 is still different (see test_commit.py)
+    if sys.version_info.minor <= 6:
+        # will be UTC
+        time1_str = time.strftime(ys.DATEFMT, time.localtime(1))
+    else:
+        time1_str = "Thu, 01 Jan 1970 03:00:01 MSK"
+    # this time is fixed in log
+    time2_str = "Thu, 01 Jan 1970 03:00:02 MSK"
+
     assert mocker_print.mock_calls == [
         call.write('No synchronization information found.'),
         call.write('\n'),
@@ -57,12 +68,12 @@ def test_log(mocker):
         call.write('\n'),
         call.write('commit 2'),
         call.write('\n'),
-        call.write('When: Thu, 01 Jan 1970 03:00:02 MSK\nWhere: user@host\n'),
+        call.write('When: {}\nWhere: user@host\n'.format(time2_str)),
         call.write(''),
         call.write('\n'),
         call.write('commit 1'),
         call.write('\n'),
-        call.write('Log is missing\nWhen: Thu, 01 Jan 1970 03:00:01 MSK\n'),
+        call.write('Log is missing\nWhen: {}\n'.format(time1_str)),
         call.write(''),
     ]
 
@@ -78,7 +89,7 @@ def test_log(mocker):
         call.write('\n'),
         call.write('commit 1'),
         call.write('\n'),
-        call.write('Log is missing\nWhen: Thu, 01 Jan 1970 03:00:01 MSK\n'),
+        call.write('Log is missing\nWhen: {}\n'.format(time1_str)),
         call.write(''),
     ]
 

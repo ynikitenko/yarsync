@@ -75,6 +75,15 @@ def test_commit(mocker):
              stdout=-3),
         call().communicate(),
     ]
+
+    # this seems patched, but the date on Python 3.6 is still different
+    assert time.tzname == "MSK"
+    if sys.version_info.minor <= 6:
+        # will be UTC
+        time_str = time.strftime(ys.DATEFMT, time_3)
+    else:
+        time_str = "Thu, 01 Jan 1970 03:00:03 MSK"
+
     assert m.mock_calls == [
         call(ys.REPOFILE),
         call().__enter__(),
@@ -82,7 +91,7 @@ def test_commit(mocker):
         call().__exit__(None, None, None),
         call(commit_log_path, "w"), call().__enter__(),
         call().write(commit_msg + "\n\n"
-                     "When: Thu, 01 Jan 1970 03:00:03 MSK\n"
+                     "When: {}\n".format(time_str) +
                      "Where: user@myhost"),
         call().write('\n'),
         call().__exit__(None, None, None),
