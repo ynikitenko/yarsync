@@ -27,8 +27,8 @@ one has to do it manually. For example, run as a superuser:
 
 .. code-block:: console
 
-    # wget https://github.com/ynikitenko/yarsync/blob/master/docs/yarsync.1.gz -P /usr/share/man/man1/
-    # mandb
+    wget https://github.com/ynikitenko/yarsync/blob/master/docs/yarsync.1.gz -P /usr/share/man/man1/
+    mandb
 
 Make sure that the manual path for your system is correct.
 The command ``mandb`` updates the index caches of manual pages.
