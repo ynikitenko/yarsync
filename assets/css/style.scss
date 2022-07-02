@@ -3,6 +3,7 @@
 @import "{{ site.theme }}";
 #header nav ul li a {
   all: unset;
+  line-height: unset;
 }
 #header {
   position: static;
