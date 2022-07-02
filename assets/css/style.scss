@@ -1,7 +1,7 @@
 ---
 ---
 @import "{{ site.theme }}";
-#header li.fork {
+#header nav ul li a {
   all: unset;
 }
 #header {
