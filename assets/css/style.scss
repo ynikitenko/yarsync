@@ -41,8 +41,8 @@
   float: left;
 }
 
-a.btn-github {
-  /* overwritten for some reasons... */
+#header nav ul li a.btn-github {
+  /* had to repeat this code */
   font-family:Helvetica, Arial, sans-serif;
   font-weight:bold;
   font-size:13px;
