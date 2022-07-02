@@ -9,6 +9,39 @@ layout: default
 It can be used to synchronize data between different hosts
 or locally (for example, to a backup drive).
 It provides a familiar <tt class="docutils literal">git</tt> command interface while working with files.</p>
+<div class="section" id="installation">
+<h1>Installation</h1>
+<p>For Arch Linux, install the <tt class="docutils literal">yarsync</tt> package from <a class="reference external" href="https://aur.archlinux.org/packages/yarsync">AUR</a>.
+Packages for other distributions are welcome.</p>
+<p>For a system-wide installation from <a class="reference external" href="https://pypi.org/project/yarsync/">PyPI</a>, run</p>
+<pre class="literal-block">
+pip install yarsync
+</pre>
+<p>Since there is no general way to install a manual page for a Python package,
+one has to do it manually. For example, run as a superuser:</p>
+<pre class="literal-block">
+# wget https://github.com/ynikitenko/yarsync/blob/master/docs/yarsync.1.gz -P /usr/share/man/man1/
+# mandb
+</pre>
+<p>Make sure that the manual path for your system is correct.
+The command <tt class="docutils literal">mandb</tt> updates the index caches of manual pages.</p>
+<p>One can also install the most recent program version
+from <a class="reference external" href="https://github.com/ynikitenko/yarsync">GitHub</a>.
+It incorporates latest improvements,
+but at the same time is less stable (new features can be changed or removed).</p>
+<pre class="literal-block">
+git clone https://github.com/ynikitenko/yarsync.git
+pip install -e yarsync
+</pre>
+<p>This installs the <tt class="docutils literal">yarsync</tt> executable to <em>~/.local/bin</em>,
+and does not require modifications of <tt class="docutils literal">PYTHONPATH</tt>.
+After that, one can pull the repository updates without reinstallation.</p>
+<p>To uninstall, run</p>
+<pre class="literal-block">
+pip uninstall yarsync
+</pre>
+<p>and remove the cloned repository.</p>
+</div>
 <div class="section" id="design-and-features">
 <h1>Design and features</h1>
 <p><tt class="docutils literal">yarsync</tt> can be used to manage hierarchies of unchanging files,
@@ -96,6 +129,25 @@ Please report to us if you have problems (or success) running it on your system.
 However, any data synchronization may lead to data loss,
 and it is recommended to have several data copies
 and always do a <em>--dry-run</em> (<em>-n</em>) first before the actual transfer.</p>
+</div>
+<div class="section" id="documentation">
+<h1>Documentation</h1>
+<p>For the complete documentation, read the installed manual
+or <a class="reference external" href="https://ynikitenko.github.io/yarsync/yarsync.1.html">GitHub Pages</a>.</p>
+<p>An article in Russian that deals more with <tt class="docutils literal">yarsync</tt> internals was posted
+on <a class="reference external" href="https://habr.com/ru/post/662163/">Habr</a>.</p>
+</div>
+<div class="section" id="thanks">
+<h1>Thanks</h1>
+<p>A good number of people have contributed to the improvement of this software.
+I'd like to express my thanks to
+Mikhail Zelenyy from MIPT NPM for the explanation of
+Python <a class="reference external" href="https://npm.mipt.ru/youtrack/articles/GENERAL-A-87/">entry points</a>,
+Jason Ryan and Matthew T Hoare for the inspiration to create a package for Arch,
+Scimmia for a comprehensive review and suggestions for my PKGBUILD,
+Open Data Russia chat for discussions about backups,
+Habr users and editors, and, finally,
+to the creators and developers of <tt class="docutils literal">git</tt> and <tt class="docutils literal">rsync</tt>.</p>
 </div>
 </div>
 </body>
