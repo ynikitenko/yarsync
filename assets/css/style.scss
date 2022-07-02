@@ -3,12 +3,17 @@
 @import "{{ site.theme }}";
 #header nav ul li a {
   all: unset;
+}
+#header nav ul li {
   line-height: unset;
 }
 #header {
   position: static;
 }
-/* adapt button from Hacker theme */
+
+/* adapt button from Hacker theme
+ https://github.com/pages-themes/hacker/blob/master/_sass/jekyll-theme-hacker.scss
+ */
 .btn {
   display:inline-block;
   background:-webkit-linear-gradient(top, rgba(40,40,40,0.3), rgba(35,35,35,0.3) 50%, rgba(10,10,10,0.3) 50%, rgba(0,0,0,0.3));
@@ -18,14 +23,34 @@
   border-bottom:2px solid rgba(0,0,0,0.7);
   border-top:2px solid #000;
   color:rgba(255,255,255,0.8);
-/*  font-family:Helvetica, Arial, sans-serif;
-*/
+  font-family:Helvetica, Arial, sans-serif;
   font-weight:bold;
   font-size:13px;
   text-decoration:none;
   text-shadow:0 -1px 0 rgba(0,0,0,0.75);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,0.05)
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
+  /* added manually 
+  line-height: 2.5;*/
 }
+
+.btn .icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin: 1px 8px 0 0;
+  float: left;
+}
+
+a.btn-github {
+  /* overwritten for some reasons... */
+  font-family:Helvetica, Arial, sans-serif;
+  font-weight:bold;
+  font-size:13px;
+  text-decoration:none;
+  text-shadow:0 -1px 0 rgba(0,0,0,0.75);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
 .btn-github .icon {
  opacity:0.6;
  background:url("../images/blacktocat.png") 0 0 no-repeat
