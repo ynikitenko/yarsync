@@ -1,6 +1,9 @@
 ---
 ---
 @import "{{ site.theme }}";
+#header li.fork {
+  all: unset;
+}
 #header {
   position: static;
 }
