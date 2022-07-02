@@ -11,10 +11,10 @@ It provides a familiar ``git`` command interface while working with files.
 Installation
 -------------
 
-For Arch Linux, install the ``yarsync`` package from `AUR <https://aur.archlinux.org/packages/yarsync>`_.
+For Arch Linux, install the ``yarsync`` package `from AUR <https://aur.archlinux.org/packages/yarsync>`_.
 Packages for other distributions are welcome.
 
-For a system-wide installation from `PyPI <https://pypi.org/project/yarsync/>`_, run
+For a system-wide installation `from PyPI <https://pypi.org/project/yarsync/>`_, run
 
 ::
 
@@ -30,7 +30,7 @@ Make sure that the manual path for your system is correct.
 The command ``mandb`` updates the index caches of manual pages.
 
 One can also install the most recent program version
-from `GitHub <https://github.com/ynikitenko/yarsync>`_.
+`from GitHub <https://github.com/ynikitenko/yarsync>`_.
 It incorporates latest improvements,
 but at the same time is less stable (new features can be changed or removed).
 
@@ -43,7 +43,7 @@ This installs the ``yarsync`` executable to *~/.local/bin*,
 and does not require modifications of ``PYTHONPATH``.
 After that, one can pull the repository updates without reinstallation.
 
-To uninstall, run
+To **uninstall**, run
 
 ::
 
@@ -167,6 +167,6 @@ Mikhail Zelenyy from MIPT NPM for the explanation of
 Python `entry points <https://npm.mipt.ru/youtrack/articles/GENERAL-A-87/>`_,
 Jason Ryan and Matthew T Hoare for the inspiration to create a package for Arch,
 Scimmia for a comprehensive review and suggestions for my PKGBUILD,
-Open Data Russia chat for discussions about backups,
+Open Data Russia chat for discussions about backup safety,
 Habr users and editors, and, finally,
 to the creators and developers of ``git`` and ``rsync``.
