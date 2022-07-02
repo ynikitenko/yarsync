@@ -28,7 +28,7 @@ To create a new repository, enter the directory with its files and type
 
 This operation is safe and will not affect existing files
 (including configuration files in an existing repository).
-Alternatively, run **init** inside an empty directory and add files afterwards.
+Alternatively, run **init** inside an empty directory and add files afterward.
 To complete the initialization, make a commit:
 
     yarsync commit -m "Initial commit"
@@ -613,7 +613,7 @@ of \"tex\" into \"work\" with an include filter \'**+**\'.
 For complete details, see FILTER RULES section of **rsync**(1).
 
     While convenient for everyday use, filters make backup more difficult.
-To synchronize repository with them, one has to remember that it has subdirectories
+To synchronize a repository with them, one has to remember that it has subdirectories
 that need to be synchronized too. If the remote repository had
 its own filters, that would make synchronization even more unreliable.
 Therefore filters are generally discouraged: **pull** and **push** ignore
