@@ -7,6 +7,8 @@ It can be used to synchronize data between different hosts
 or locally (for example, to a backup drive).
 It provides a familiar ``git`` command interface while working with files.
 
+YARsync is a Free Software project covered by the GNU General Public License version 3.
+
 -------------
 Installation
 -------------
@@ -14,14 +16,16 @@ Installation
 For Arch Linux, install the ``yarsync`` package `from AUR <https://aur.archlinux.org/packages/yarsync>`_.
 Packages for other distributions are welcome.
 
-For a system-wide installation `from PyPI <https://pypi.org/project/yarsync/>`_, run
+For an installation `from PyPI <https://pypi.org/project/yarsync/>`_, run
 
-::
+.. code-block:: console
 
     pip install yarsync
 
 Since there is no general way to install a manual page for a Python package,
-one has to do it manually. For example, run as a superuser::
+one has to do it manually. For example, run as a superuser:
+
+.. code-block:: console
 
     # wget https://github.com/ynikitenko/yarsync/blob/master/docs/yarsync.1.gz -P /usr/share/man/man1/
     # mandb
@@ -34,7 +38,7 @@ One can also install the most recent program version
 It incorporates latest improvements,
 but at the same time is less stable (new features can be changed or removed).
 
-::
+.. code-block:: console
 
     git clone https://github.com/ynikitenko/yarsync.git
     pip install -e yarsync
@@ -45,7 +49,7 @@ After that, one can pull the repository updates without reinstallation.
 
 To **uninstall**, run
 
-::
+.. code-block:: console
 
     pip uninstall yarsync
 
@@ -153,7 +157,10 @@ and always do a *--dry-run* (*-n*) first before the actual transfer.
 Documentation
 -------------
 For the complete documentation, read the installed manual
-or `GitHub Pages <https://ynikitenko.github.io/yarsync/yarsync.1.html>`_.
+or `GitHub Pages <https://ynikitenko.github.io/yarsync/man>`_.
+
+For more in-depth topics or alternatives, see
+`details <https://ynikitenko.github.io/yarsync/details>`_.
 
 An article in Russian that deals more with ``yarsync`` internals was posted
 on `Habr <https://habr.com/ru/post/662163/>`_.
