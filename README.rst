@@ -156,8 +156,8 @@ and always do a *--dry-run* (*-n*) first before the actual transfer.
 -------------
 Documentation
 -------------
-For the complete documentation, read the installed manual
-or `GitHub Pages <https://ynikitenko.github.io/yarsync/man>`_.
+For the complete documentation, read the installed
+or online `manual <https://ynikitenko.github.io/yarsync/man>`_.
 
 For more in-depth topics or alternatives, see
 `details <https://ynikitenko.github.io/yarsync/details>`_.

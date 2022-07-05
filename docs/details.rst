@@ -21,7 +21,7 @@ clone the repository and install Python packages for tests:
 
 .. To propose a feature, please open a new issue first for a design discussion.
 
-``yarsync`` was tested on ext4 and SimFS on Arch Linux and CentOS.
+``yarsync`` was tested on ext4, NFSv4 and SimFS on Arch Linux and CentOS.
 Tests on other systems would be useful.
 
 ----------

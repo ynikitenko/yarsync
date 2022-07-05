@@ -1,9 +1,9 @@
-% YARSYNC(1) yarsync 0.1 | YARsync Manual
+% YARSYNC(1) yarsync 0.1.1 | YARsync Manual
 % Written by Yaroslav Nikitenko
 % June 2022
 
 # NAME
-Yet Another Rsync is a file synchronization and backup tool
+yarsync - a file synchronization and backup tool
 
 # SYNOPSIS
 **yarsync** [**-h**] \[**\--config-dir** *DIR*\] \[**\--root-dir** *DIR*\] \[**-q** | **-v**\] *command* \[*args*\]
@@ -11,8 +11,8 @@ Yet Another Rsync is a file synchronization and backup tool
 [comment]: # (to see it converted to man, use pandoc yarsync.1.md -s -t man | /usr/bin/man -l -)
 
 # DESCRIPTION
-**yarsync** is a wrapper around rsync to store its configuration
-and synchronize repositories with the interface similar to git.
+Yet Another Rsync stores rsync configuration
+and synchronizes repositories with the interface similar to git.
 It is *efficient* (files in the repository can be removed
 and renamed freely without additional transfers),
 *distributed* (several replicas of the repository can diverge,
@@ -78,7 +78,7 @@ Similarly, one can copy a repository *from* a remote: just change the order of p
 and don't forget about the slash.
 To check that we set up the repositories correctly, make a dry run with \'**-n**\':
 
-    yarsync push -n my_remote
+    yarsync -v push -n my_remote
 
 If there are no errors and no file transfers, then we have a functioning remote.
 We can continue working locally, adding and removing files and making commits.
@@ -656,6 +656,9 @@ which may be present on formerly used devices.
 **9**
 : System error
 
+**2-6**,**10-14**,**20-25**,**30**,**35**
+: rsync error
+
 If the command could be run successfully, a zero code is returned.
 Invalid option code is returned for mistakes in command line argument syntax.
 Configuration error can occur when we are outside an existing repository
@@ -664,9 +667,7 @@ If the repository is correct, but the command is not allowed in its current stat
 (for example, one can not push or pull when there are uncommitted changes
 or add a remote with an already present name), the command error is returned.
 It is also possible that a general system error, such as a keyboard interrupt,
-is raised in the Python interpreter.
-
-In case of rsync errors, its error code is returned.
+is raised in the Python interpreter. See **rsync**(1) for rsync errors.
 
 # DIAGNOSTICS
 
@@ -707,7 +708,6 @@ Requires a filesystem with hard links,
 rsync version at least 3.1.0 (released 28 September 2013) and Python >= 3.6.
 
 Always do a **\--dry-run** before actual changes.
-
 Occasionally Python errors are raised instead of correct return codes.
 Please report any bugs or make feature requests to
 <https://github.com/ynikitenko/yarsync/issues>.
