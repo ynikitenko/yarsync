@@ -39,7 +39,7 @@ def test_pull_push_uncommitted(
 
 
 @pytest.mark.parametrize("backup_dir", [True, False])
-def test_backup(tmp_path_factory, backup_dir):
+def test_backup(tmp_path_factory, backup_dir, test_dir):
     local_path = tmp_path_factory.mktemp("local")
     remote_path = tmp_path_factory.mktemp("remote")
     local = local_path.__str__()
@@ -47,7 +47,7 @@ def test_backup(tmp_path_factory, backup_dir):
 
     ## clone test_dir -> remote -> local
     # now local has remote as an "origin" remote
-    ys_clone = YARsync(["yarsync", "-qq", "clone", TEST_DIR, remote])
+    ys_clone = YARsync(["yarsync", "-qq", "clone", test_dir, remote])
     ys_clone()
     ys_clone._clone(remote, local)
     print("created yarsync repositories {} and {}".format(remote, local))
