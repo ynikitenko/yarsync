@@ -7,7 +7,7 @@ with open("README.rst", "r") as readme:
 
 setuptools.setup(
     name="yarsync",
-    version="0.1",
+    version="0.1.1",
     author="Yaroslav Nikitenko",
     author_email="metst13@gmail.com",
     description="Yet Another Rsync is a file synchronization and backup tool",
@@ -16,7 +16,7 @@ setuptools.setup(
     long_description_content_type="text/x-rst",
     url="https://github.com/ynikitenko/yarsync",
     project_urls = {
-        # 'Documentation': 'https://github.com/ynikitenko/yarsync',
+        'Documentation': 'https://ynikitenko.github.io/yarsync/',
         'Source': 'https://github.com/ynikitenko/yarsync',
         'Tracker': 'https://github.com/ynikitenko/yarsync/issues',
     },
@@ -30,6 +30,7 @@ setuptools.setup(
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Operating System :: POSIX :: Linux",
         "Programming Language :: Python :: 3 :: Only",
+        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",

@@ -7,6 +7,56 @@ It can be used to synchronize data between different hosts
 or locally (for example, to a backup drive).
 It provides a familiar ``git`` command interface while working with files.
 
+YARsync is a Free Software project covered by the GNU General Public License version 3.
+
+-------------
+Installation
+-------------
+
+For Arch Linux, install the ``yarsync`` package `from AUR <https://aur.archlinux.org/packages/yarsync>`_.
+Packages for other distributions are welcome.
+
+For an installation `from PyPI <https://pypi.org/project/yarsync/>`_, run
+
+.. code-block:: console
+
+    pip install yarsync
+
+Since there is no general way to install a manual page for a Python package,
+one has to do it manually. For example, run as a superuser:
+
+.. code-block:: console
+
+    wget https://github.com/ynikitenko/yarsync/blob/master/docs/yarsync.1
+    gzip yarsync.1
+    mv yarsync.1.gz /usr/share/man/man1/
+    mandb
+
+Make sure that the manual path for your system is correct.
+The command ``mandb`` updates the index caches of manual pages.
+
+One can also install the most recent program version
+`from GitHub <https://github.com/ynikitenko/yarsync>`_.
+It incorporates latest improvements,
+but at the same time is less stable (new features can be changed or removed).
+
+.. code-block:: console
+
+    git clone https://github.com/ynikitenko/yarsync.git
+    pip install -e yarsync
+
+This installs the ``yarsync`` executable to *~/.local/bin*,
+and does not require modifications of ``PYTHONPATH``.
+After that, one can pull the repository updates without reinstallation.
+
+To **uninstall**, run
+
+.. code-block:: console
+
+    pip uninstall yarsync
+
+and remove the cloned repository.
+
 --------------------
 Design and features
 --------------------
@@ -95,7 +145,7 @@ In particular, ``rsync`` can be found:
 * can be installed on `Windows <https://superuser.com/questions/300263/how-to-use-rsync-from-windows-pc-to-remote-linux-server>`_.
 
 ``yarsync`` runs successfully on Linux.
-Feel free to report to us if you have problems (or success) running it on your system.
+Please report to us if you have problems (or success) running it on your system.
 
 -------
 Safety
@@ -104,3 +154,28 @@ Safety
 However, any data synchronization may lead to data loss,
 and it is recommended to have several data copies
 and always do a *--dry-run* (*-n*) first before the actual transfer.
+
+-------------
+Documentation
+-------------
+For the complete documentation, read the installed
+or online `manual <https://ynikitenko.github.io/yarsync/man>`_.
+
+For more in-depth topics or alternatives, see
+`details <https://ynikitenko.github.io/yarsync/details>`_.
+
+An article in Russian that deals more with ``yarsync`` internals was posted
+on `Habr <https://habr.com/ru/post/662163/>`_.
+
+-------
+Thanks
+-------
+A good number of people have contributed to the improvement of this software.
+I'd like to express my thanks to
+Mikhail Zelenyy from MIPT NPM for the explanation of
+Python `entry points <https://npm.mipt.ru/youtrack/articles/GENERAL-A-87/>`_,
+Jason Ryan and Matthew T Hoare for the inspiration to create a package for Arch,
+Scimmia for a comprehensive review and suggestions for my PKGBUILD,
+Open Data Russia chat for discussions about backup safety,
+Habr users and editors, and, finally,
+to the creators and developers of ``git`` and ``rsync``.
