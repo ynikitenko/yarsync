@@ -78,7 +78,7 @@ Similarly, one can copy a repository *from* a remote: just change the order of p
 and don't forget about the slash.
 To check that we set up the repositories correctly, make a dry run with \'**-n**\':
 
-    yarsync -v push -n my_remote
+    yarsync push -n my_remote
 
 If there are no errors and no file transfers, then we have a functioning remote.
 We can continue working locally, adding and removing files and making commits.

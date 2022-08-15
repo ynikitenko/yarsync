@@ -1157,48 +1157,14 @@ class YARsync():
             commit_candidates = []
         return list(map(int, filter(_is_commit, commit_candidates)))
 
-    def _get_missing_commits(self, from_path, to_path):
-        """Return a list of commits (directories) present on *from_path*
-        and missing on *to_path*.
-        """
-        # "-r" means recursive
-        # "-r --exclude='/*/*'" means
-        # to list a single directory without recursion.
-        # If a pattern ends with a '/',
-        # then it will only match a directory
-        command = "rsync -nr --info=NAME --include=/ --exclude=/*/*".split() \
-                  + [from_path, to_path]
-        # self._print(" ".join(command), debug=True)
-        completed_process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE  #, stderr=subprocess.PIPE
-        )
-        stdoutdata, stderrdata = completed_process.communicate()
-        returncode = completed_process.returncode
-        if returncode:
-            err_msg = (
-                "an error occurred during commit listing, "
-                "rsync returned {}".format(returncode)
-            )
-            _print_error(err_msg)
-            # todo: this should raise a custom exception
-            # with the returned rsync code.
-            raise OSError(err_msg)
-        raw_names = stdoutdata.split()
-        # commit folder can have files from the user
-        # (maybe it should not be allowed: are they transferred at all?..)
-        dirs = (os.path.dirname(str(dir_, 'utf-8')) for dir_ in raw_names)
-        missing_commits = [int(os.path.basename(dir_)) for dir_ in dirs if dir_]
-        return missing_commits
-
     def _get_remote_commits(self, commit_dir, print_level=3):
         """Return remote commits as a list of integers."""
         try:
             remote_files = self._get_remote_files(commit_dir, print_level)
         except OSError:
+            # detailed error messages are already printed by rsync
             raise OSError(
-                "error during listing remote commits: rsync returned {}"\
-                .format(returncode)
+                "error during listing remote commits"
             )
 
         commits = []
@@ -1218,6 +1184,13 @@ class YARsync():
         Remote can be local.
         """
         command = ["rsync", "--list-only", path]
+        # Another variant:
+        # "-r --exclude='/*/*'" means
+        # to list a single directory without recursion.
+        # If a pattern ends with a '/',
+        # then it will only match a directory.
+        # command = "rsync -nr --info=NAME --include=/ --exclude=/*/*".split() \
+        #           + [from_path, to_path]
         self._print_command(" ".join(command), level=print_level)
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
         sp.wait()
@@ -1530,12 +1503,18 @@ class YARsync():
 
         # --link-dest is not needed, since if a file is new,
         # it won't be in remote commits.
-        # -H preserves hard links in one set of files (but see the note in todo.txt)
-        command = ["rsync", "-avHP"]
+        # -H preserves hard links in one set of files (but see the note in todo.txt).
+        command = ["rsync", "-avH"]
+        # Don't print progress by default,
+        # because it clutters output for new commits.
+        # (it will create an additional line for each file
+        #  and will require extra work to get rid of it).
+        if self.print_level >= 3:
+            command.append("-P")
 
         dry_run = self._args.dry_run
         if dry_run:
-            command += ["-n"]
+            command.append("-n")
         command_str = " ".join(command)
 
         if not new:
@@ -1586,24 +1565,25 @@ class YARsync():
         remote_commits = self._get_remote_commits(remote_commits_dir,
                                                   print_level=3)
 
-        if not force:
-            # We require all commits, not only most recent ones.
-            # We probably don't check for existence of local commits
-            # if we want to push (that would raise an error).
-            if command_name == "push":
-                missing_commits = self._get_missing_commits(
-                    remote_commits_dir, self.COMMITDIR + '/'
-                )
-            elif os.path.exists(self.COMMITDIR):
-                missing_commits = self._get_missing_commits(
-                    self.COMMITDIR + '/', remote_commits_dir
-                )
-            else:
-                # missing_commits are those that can be overwritten
-                # by push or pull.
-                # For pull and empty COMMITDIR there are no missing commits.
-                missing_commits = []
-                # missing_commits = self._get_remote_commits(remote_commits_dir)
+        # missing_commits can be overwritten by pull or push
+        if command_name == "push":
+            source_commits = local_commits
+            dest_commits = remote_commits
+        else:
+            # pull
+            source_commits = remote_commits
+            dest_commits = local_commits
+            rmcomm = set(remote_commits)
+            missing_commits = [comm for comm in local_commits
+                               if comm not in rmcomm]
+
+        # use a set to economize testing membership in a list,
+        # https://stackoverflow.com/a/3462202/952234
+        # Can move into the comprehension. Not used anywhere else.
+        # https://docs.python.org/3/reference/simple_stmts.html#grammar-token-python-grammar-target_list
+        _source_commits = set(source_commits)
+        missing_commits = [comm for comm in dest_commits
+                           if comm not in _source_commits]
 
         if not (force or new) and missing_commits:
             missing_commits_str = ", ".join(map(str, missing_commits))
@@ -1620,22 +1600,61 @@ class YARsync():
                 "(removing all commits and logs missing on the destination)."
             )
 
-        self._print_command(command_str, level=3)
-
         if self.print_level >= 3:
             stdout = None
         elif self.print_level == 2:
-            # todo: parse manually and group all commit messages into one
-            # Commits transferred: [..., ...]
-            # Note that "The data read is buffered in memory,
-            # so do not use this method
-            # if the data size is large or unlimited."
-            # https://docs.python.org/3/library/subprocess.html#subprocess.Popen.communicate
             stdout = subprocess.PIPE
         else:
             stdout = subprocess.DEVNULL
+
+        self._print_command(command_str, level=3)
+
+        # ----------------------------------------------------------
+        #         Run
         completed_process = subprocess.Popen(command, stdout=stdout)
-        stdoutdata, _ = completed_process.communicate()
+        # ----------------------------------------------------------
+
+        if self.print_level == 2:
+            # if we transfer a whole commit, merge all its output into one line.
+            # Print transfers only for the working directory and existing commits.
+            commits_to_transfer = set(source_commits) - set(dest_commits)
+            transferred_commits = set()
+            for line in iter(completed_process.stdout.readline, b''):
+                # iteration copied from https://stackoverflow.com/a/1606870/952234
+                # Not self.COMMITDIR, because it involves the complete path.
+                COMMITDIR = os.path.join(".ys", "commits")
+                if line.startswith(bytes(COMMITDIR, "utf-8")):
+                    # commits
+                    com_start = len(COMMITDIR) + 1
+                    # or os.sep
+                    com_end = line.find(b'/', com_start)
+                    com_str = line[com_start:com_end]
+                    if not com_str:
+                        # ".ys/commits/"
+                        print(line.decode("utf-8"), end='')
+                        continue
+                    cur_commit = int(com_str)
+                    if cur_commit in commits_to_transfer:
+                        # don't print transfers for complete new commits.
+                        transferred_commits.add(cur_commit)
+                    else:
+                        # print changes for existing commits
+                        print(line.decode("utf-8"), end='')
+                else:
+                    # working directory
+                    print(line.decode("utf-8"), end='')
+            # there can be also lines like
+            # file => .ys/commits/.../file
+            # leave them as they are.
+            #
+            # actually, this may be only part of the data
+            # (if there is no space left)
+            print()  # "data transferred for commits:")
+            for comm in sorted(transferred_commits):
+                print("commit", comm)
+        else:
+            completed_process.wait()
+
         returncode = completed_process.returncode
         if returncode:
             _print_error(
