@@ -6,6 +6,20 @@ Since ``yarsync`` allows to use a command interface similar to ``git``,
 one can synchronize several repositories simultaneously using
 `myrepos <https://myrepos.branchable.com/>`_.
 
+If new data was added to several repositories simultaneously,
+commit the changes on one of them and synchronize that with the another.
+``rsync`` should link the working directory with commits properly.
+This may fail depending on how you actually copied files (they may have
+changed attributes).
+In this case, create new commits in both repositories
+and manually rename them to be the same.
+Try to synchronize to see that all is linked properly.
+For example, when we move photographs from an SD card, we want to have
+at least two copies of them.
+It would be more reliable to copy data from the original source to two repositories
+than to push that from one of them to another (possible errors on the intermediate filesystem
+increase the risk). Make sure that the two repositories were synchronized beforehand.
+
 ------------
 Development
 ------------
