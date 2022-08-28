@@ -27,7 +27,7 @@ one has to do it manually. For example, run as a superuser:
 
 .. code-block:: console
 
-    wget https://github.com/ynikitenko/yarsync/blob/master/docs/yarsync.1
+    wget https://github.com/ynikitenko/yarsync/raw/master/docs/yarsync.1
     gzip yarsync.1
     mv yarsync.1.gz /usr/share/man/man1/
     mandb
