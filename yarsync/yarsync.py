@@ -1481,20 +1481,21 @@ class YARsync():
                 "Manually update the working directory and *commit*."
             )
 
-        returncode, changed = self._status(check_changed=True)
-        if changed:
-            _print_error(
-                "local repository has uncommitted changes. Exit.\n  "
-                "Run '{} status' for more details.".format(self.NAME)
-            )
-            return COMMAND_ERROR
-        if returncode:
-            _print_error(
-                "could not check for uncommitted changes, "
-                "rsync returned {}. Exit\n  ".format(returncode) +
-                "Run '{} status' for more details.".format(self.NAME)
-            )
-            return COMMAND_ERROR
+        if not new:
+            returncode, changed = self._status(check_changed=True)
+            if changed:
+                _print_error(
+                    "local repository has uncommitted changes. Exit.\n  "
+                    "Run '{} status' for more details.".format(self.NAME)
+                )
+                return COMMAND_ERROR
+            if returncode:
+                _print_error(
+                    "could not check for uncommitted changes, "
+                    "rsync returned {}. Exit\n  ".format(returncode) +
+                    "Run '{} status' for more details.".format(self.NAME)
+                )
+                return COMMAND_ERROR
 
         try:
             full_destpath = self._get_dest_path(remote)
