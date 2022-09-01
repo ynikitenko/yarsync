@@ -1534,9 +1534,10 @@ class YARsync():
             # write new files near originals
             command.append("--backup")
             command_str += " --backup"
-        elif not overwrite:
-            command.append("--ignore-existing")
-            command_str += " --ignore-existing"
+        # allow after a fix of https://github.com/WayneD/rsync/issues/357
+        # elif not overwrite:
+        #     command.append("--ignore-existing")
+        #     command_str += " --ignore-existing"
 
         # we don't include commits (filter them in)
         # only if we do backups
