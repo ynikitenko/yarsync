@@ -330,6 +330,10 @@ class YARsync():
         parser_init = subparsers.add_parser("init",
                                             help="initialize a repository")
         parser_init.add_argument(
+            "--merge", action="store_true", help="merge existing repositories"
+        )
+        # reponame is used during commits
+        parser_init.add_argument(
             "reponame", nargs="?", metavar="<reponame>",
             help="name of the repository (for commits and logs)"
         )
@@ -633,7 +637,7 @@ class YARsync():
             )
         elif args.command_name == "init":
             # https://stackoverflow.com/a/41070441/952234
-            self._func = functools.partial(self._init, args.reponame)
+            self._func = functools.partial(self._init, args.reponame, args.merge)
             # this also works, but lambdas can't be pickled
             # (even though we don't need that)
             # self._func = lambda: self._init(self._args.reponame)
@@ -1212,7 +1216,7 @@ class YARsync():
 
         return files
 
-    def _init(self, reponame):
+    def _init(self, reponame, merge=False):
         """Initialize default configuration.
 
         Create configuration folder, configuration and repository files.
@@ -1222,6 +1226,10 @@ class YARsync():
 
         *reponame* will be written to self.REPOFILE
         and used during commits.
+
+        If *merge* is ``True``, the repository comprises several existing ones.
+        This can be used to rearrange them
+        without re-sending present remote files.
         """
         init_repo_str = "Initialize configuration"
         if reponame:
@@ -1259,10 +1267,10 @@ class YARsync():
         if not os.path.exists(repofile):
             if not reponame:
                 self._print(
-                    "# To use a repository name different from `hostname`"
+                    "# (to use a repository name different from `hostname`"
                     " for commit logs,\n"
-                    "# provide it as an argument to 'init'"
-                    " or write it to {}".format(repofile)
+                    "#  provide it as an argument to 'init'"
+                    " or write it to {})".format(repofile)
                 )
             else:
                 self._print("# create configuration file {}".format(repofile))
@@ -1271,6 +1279,30 @@ class YARsync():
                 new_config = True
         else:
             self._print("{} already exists, skip".format(repofile), level=2)
+
+        if merge:
+            dirs = os.listdir('.')
+            # it is recommended to merge existing repositories
+            # (not just any directories),
+            # but we don't check it here.
+            filter_strs = ["# created by 'yarsync init --merge'"]
+            for dir_ in dirs:
+                if not os.path.isdir(dir_):
+                    continue
+                if dir_ == ysdir:
+                    continue
+                # transfer commits and logs (to keep track of hard links)
+                filter_strs.append("+ /" + dir_ + "/.ys/commits")
+                filter_strs.append("+ /" + dir_ + "/.ys/logs")
+                # not transfer repository configuration
+                filter_strs.append("- /" + dir_ + "/.ys")
+            # --merge overwrites this file.
+            # if os.path.exists(self.RSYNCFILTER):
+            with open(self.RSYNCFILTER, 'w') as fil:
+                for str_ in filter_strs:
+                    print(str_, file=fil)
+            new_config = True
+            self._print("# Created configuration file {}".format(self.RSYNCFILTER))
 
         ysdir_fp = os.path.realpath(ysdir)
         if new_config:
