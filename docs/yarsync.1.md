@@ -355,7 +355,7 @@ one gets files *a* and *a~* in the working directory.
 One should first see, which version is correct.
 If it is the local file *a~*, then the backup can be removed:
 
-        mv a~ a*
+        mv a~ a
 
     By local we mean the one hard linked with local commits
 (run *ls -i* to be sure).

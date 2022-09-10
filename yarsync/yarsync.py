@@ -149,6 +149,7 @@ def _is_commit(file_name):
 
 
 def _print_error(msg):
+    # todo: allow arbitrary number of arguments.
     # not a class method, because it can be run
     # when YARsync was not fully initialized yet.
     print("!", msg, file=sys.stderr)
@@ -1164,12 +1165,15 @@ class YARsync():
     def _get_remote_commits(self, commit_dir, print_level=3):
         """Return remote commits as a list of integers."""
         try:
-            remote_files = self._get_remote_files(commit_dir, print_level)
+            remote_files = self._get_remote_files(commit_dir, print_level=print_level)
         except OSError:
-            # detailed error messages are already printed by rsync
-            raise OSError(
-                "error during listing remote commits"
-            )
+            return []
+            # allow a missing commit directory for a new repository
+            # (can simply push local commits there).
+            # # detailed error messages are already printed by rsync
+            # raise OSError(
+            #     "error during listing remote commits"
+            # )
 
         commits = []
         for comm in remote_files:
@@ -1196,7 +1200,11 @@ class YARsync():
         # command = "rsync -nr --info=NAME --include=/ --exclude=/*/*".split() \
         #           + [from_path, to_path]
         self._print_command(" ".join(command), level=print_level)
-        sp = subprocess.Popen(command, stdout=subprocess.PIPE)
+        if print_level:
+            stderr = None  # all errors printed
+        else:
+            stderr = subprocess.PIPE
+        sp = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=stderr)
         sp.wait()
 
         returncode = sp.returncode
@@ -1230,6 +1238,61 @@ class YARsync():
         If *merge* is ``True``, the repository comprises several existing ones.
         This can be used to rearrange them
         without re-sending present remote files.
+        """
+        """
+How to merge:
+    1) Prepare the merge.
+       a) synchronize all needed repositories (bring them to the same state).
+          This is not needed (see comment about commits), but will make things easier.
+       b) Check that you have not too many files (hard links),
+          because they will triple during the merge.
+          Consider removing some old commits (and sync again).
+          But don't be overly cautious:
+          for hundreds of thousands of files this worked fine for the author.
+       c') Move non-merging repositories out of the directory with merging ones.
+          This might be safer, but is unnecessary unless you care about more hard links.
+       c'') Alternatively, move all merging repositories to a new directory.
+           Since you've already synchronized them, preserving their remote paths is not needed.
+    3) (actually now 2) Init and commit.
+       [source] yarsync init --merge
+       [source] yarsync commit -m "Merging. Initialize."
+    4) Check that the repositories and filters are correct.
+    5) create a remote merging repository (--merge is needed, otherwise
+       remote status will show files in subdir/.ys/ .
+       Probably won't affect actual transfers, because all filters
+       will act on the sending side).
+       [dest] yarsync init --merge
+       Remove new rsync filters on dest, but it is not needed
+       (we assume that the destination has no filters!)
+    6) Push commits to destination
+       # test, as ever
+       [source] yarsync push -n <dest>
+       [source] yarsync push <dest>
+    7) now they are synced. Reorganize data (tip: just move gross directories
+       to corresponding repositories, finely rearrange them any time later).
+       Can remove the merging subrepository. It is saved in commits.
+       [source] # yarsync status
+       [source] yarsync commit -m "Merge done."
+       May remove the merging repository from .ys/rsync-filter .
+    7') (optional) make commits in the resulting subrepositories.
+       [source/repo] yarsync commit -m "Merged that and that data from <merged repo>."
+       Probably don't do that, or deal with rsync filters in their roots.
+    8) push data to its destination.
+       [source] # yarsync push -n <dest>
+       [source] yarsync push <dest>
+       If you removed the repository locally, but didn't wipe it from the filter,
+       rsync will refuse to delete its remote configuration,
+       because it is still protected by filter rules.
+       You can remove it manually on the destination.
+       [dest] # rm -rf <merged_dir>
+    9) Finish merge. Move all repositories to their initial directories.
+    9') If you didn't commit during 7', commit changes to local repositories
+        and push them to the destination.
+        This should be really quick, because all files are already there.
+        This could be done after 10), but is a bit safer before that.
+    10) Remove the merging repository. Check that the current path is correct before that!
+        [local] rm -rf .ys
+        [remote] rm -rf .ys
         """
         init_repo_str = "Initialize configuration"
         if reponame:
@@ -1281,22 +1344,74 @@ class YARsync():
             self._print("{} already exists, skip".format(repofile), level=2)
 
         if merge:
+            rsync_filter = "rsync-filter"
             dirs = os.listdir('.')
             # it is recommended to merge existing repositories
             # (not just any directories),
             # but we don't check it here.
             filter_strs = ["# created by 'yarsync init --merge'"]
             for dir_ in dirs:
+                if not os.path.exists(os.path.join(dir_, ".ys")):
+                    # not yarsync repositories
+                    continue
                 if not os.path.isdir(dir_):
+                    # simple files
                     continue
                 if dir_ == ysdir:
+                    # we are already in a merging repository,
+                    # and init is idempotent.
                     continue
-                # transfer commits and logs (to keep track of hard links)
+                # transfer commits and logs.
+                # This allows to sync the resulting
+                # repositories simultaneously.
+                # If one wants have fewer hard links,
+                # they should remove these include lines manually.
                 filter_strs.append("+ /" + dir_ + "/.ys/commits")
                 filter_strs.append("+ /" + dir_ + "/.ys/logs")
-                # not transfer repository configuration
-                filter_strs.append("- /" + dir_ + "/.ys")
-            # --merge overwrites this file.
+                ys_filter = os.path.join(dir_, ".ys", rsync_filter)
+                if os.path.exists(ys_filter):
+                    # copy rsync filters, so that they have effect
+                    # on the repository (not only inside .ys directory).
+                    filter_copy = os.path.join(dir_, rsync_filter)
+                    # check that we don't destroy existing files.
+                    if os.path.exists(filter_copy):
+                        if (os.stat(filter_copy).st_ino !=
+                            os.stat(ys_filter).st_ino):
+                            # st_ino is platform dependent,
+                            # but since we use commits
+                            # and we are on Linux,
+                            # it should always work (for Windows too).
+                            # https://docs.python.org/3/library/os.html#os.stat_result
+                            _print_error(
+                                filter_copy + " exists. "
+                                "Can't link existing filter {}/.ys/rsync-filter."
+                                "\n  Remove or rename that file.".format(dir_)
+                            )
+                            raise YSCommandError()
+                    else:
+                        os.link(ys_filter, filter_copy)
+                    # Filters for different repositories
+                    # must be independent,
+                    # therefore they are "per-directory"
+                    # (single-instance ones
+                    #  are simply incorporated into the filter).
+                    # Possible problems:
+                    # - stray rsync-filters (thouse outside .ys,
+                    #   that would normally have no effect).
+                    # -- seems a larger path works fine.
+                    # - excluding/including more than needed.
+                    # -- surprisingly, various/repos
+                    #    was correctly created.
+                    filter_strs.append(": " + dir_ + "/.ys/rsync-filter")
+                    filter_strs.append("- " + filter_copy)
+                    # don't use a slash before dir_,
+                    # otherwise it will search in upper directories.
+                # not transfer repository configuration.
+                # /* is very important at the end,
+                # because with /.ys it will not consider anything there
+                # (includes discarded).
+                filter_strs.append("- /" + dir_ + "/.ys/*")
+            # --merge overwrites this file every init.
             # if os.path.exists(self.RSYNCFILTER):
             with open(self.RSYNCFILTER, 'w') as fil:
                 for str_ in filter_strs:
@@ -1596,8 +1711,11 @@ class YARsync():
         # if there are no remote commits (a new repository),
         # push will still work
         remote_commits_dir = os.path.join(full_destpath, ".ys", "commits/")
-        remote_commits = self._get_remote_commits(remote_commits_dir,
-                                                  print_level=3)
+        remote_commits = self._get_remote_commits(
+            remote_commits_dir,
+            # don't complain about errors
+            print_level=0
+        )
 
         # missing_commits can be overwritten by pull or push
         if command_name == "push":
