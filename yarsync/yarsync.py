@@ -577,6 +577,11 @@ class YARsync():
         # contains repository name
         self.REPOFILE = os.path.join(self.config_dir, "repository.txt")
         self.RSYNCFILTER = os.path.join(self.config_dir, "rsync-filter")
+        # yarsync repositories are owned by one user.
+        # However, different machines can have different user
+        # and group ids, so we don't push extraneous ids there.
+        # Used in pull and push (and indirectly in clone).
+        self.RSYNCOPTIONS = ["-avH", "--no-owner", "--no-group"]
         # stores last synchronized commit
         self.SYNCFILE = os.path.join(self.config_dir, "sync.txt")
 
@@ -1652,7 +1657,8 @@ How to merge:
         # --link-dest is not needed, since if a file is new,
         # it won't be in remote commits.
         # -H preserves hard links in one set of files (but see the note in todo.txt).
-        command = ["rsync", "-avH"]
+        command = ["rsync"]
+        command.extend(self.RSYNCOPTIONS)
         # Don't print progress by default,
         # because it clutters output for new commits.
         # (it will create an additional line for each file
