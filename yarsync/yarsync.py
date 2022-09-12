@@ -1633,7 +1633,7 @@ How to merge:
                 "Manually update the working directory and *commit*."
             )
 
-        if not new:
+        if not (new or force):
             returncode, changed = self._status(check_changed=True)
             if changed:
                 _print_error(
