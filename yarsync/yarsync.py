@@ -2105,7 +2105,9 @@ How to merge:
         filter_command, filter_str = self._get_filter(include_commits=False)
 
         command_begin = [
-            "rsync", "-aun", "--no-inc-recursive", "--delete", "-i", "--exclude=/.ys"
+            "rsync", "-aun", "--no-inc-recursive", "--delete", "-i",
+            "--no-group", "--no-owner",
+            "--exclude=/.ys"
         ]
         command_str = " ".join(command_begin)
 
