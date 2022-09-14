@@ -1671,9 +1671,10 @@ How to merge:
             command.append("-n")
         command_str = " ".join(command)
 
+        command.append("--no-inc-recursive")
         if not new:
-            command.append("--delete-after")
-            command_str += " --delete-after"
+            command.append("--delete")
+            command_str += " --delete"
 
         if backup:
             if backup_dir:
@@ -1827,11 +1828,17 @@ How to merge:
                 self._print("local commits missing")
             if not remote_commits:
                 self._print("remote commits missing")
+            self._print("run {} without --new to fully synchronize "
+                        "repositories".format(command_name))
         elif new:
             last_remote_comm = max(remote_commits)
             if last_remote_comm in local_commits:
                 # remote commits are within locals (except some old ones)
                 # update the working directory
+                #
+                # Warning: if commits were not pulled completely,
+                # this command will delete some new files
+                # in the working directory!
                 self._checkout(max(local_commits))
                 self._print("remote commits automatically merged")
             else:
