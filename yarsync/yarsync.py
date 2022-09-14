@@ -182,7 +182,7 @@ def _substitute_env(content):
         return os.environ.get(key)
 
     # todo: allow more sophisticated variables, like ${VAR}
-    # (and that's all), should be an OR of this and 
+    # (and that's all), should be an OR of this and
     # r'(\${(\w+)})'), untested.
     # Not sure it's needed: why such complications to a config file?..
     pattern = re.compile(r'(\$(\w+))')
@@ -841,7 +841,7 @@ class YARsync():
         # copied from _status()
         commit_dir = os.path.join(self.COMMITDIR, str(commit))
 
-        command_begin = ["rsync", "-au"]
+        command_begin = ["rsync", "-au", "--no-inc-recursive"]
         if self._args.dry_run:
             command_begin += ["-n"]
         command_begin.extend(["--delete", "-i", "--exclude=/.ys"])
@@ -1033,7 +1033,7 @@ class YARsync():
             raise ValueError("commit {} does not exist".format(comm2))
 
         command = [
-            "rsync", "-aun", "--delete", "-i", 
+            "rsync", "-aun", "--no-inc-recursive", "--delete", "-i",
         ]
         # outbuf option added in Rsync 3.1.0 (28 Sep 2013)
         # https://download.samba.org/pub/rsync/NEWS#ENHANCEMENTS-3.1.0
@@ -1464,7 +1464,7 @@ How to merge:
                 # no log directory exists
                 log_files = []
             logs = get_sorted_logs_int(log_files, commits)
-        
+
         if commits is None:
             commits = sorted(self._get_local_commits())
         else:
@@ -2105,7 +2105,7 @@ How to merge:
         filter_command, filter_str = self._get_filter(include_commits=False)
 
         command_begin = [
-            "rsync", "-aun", "--delete", "-i", "--exclude=/.ys"
+            "rsync", "-aun", "--no-inc-recursive", "--delete", "-i", "--exclude=/.ys"
         ]
         command_str = " ".join(command_begin)
 
