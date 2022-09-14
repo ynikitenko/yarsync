@@ -841,7 +841,11 @@ class YARsync():
         # copied from _status()
         commit_dir = os.path.join(self.COMMITDIR, str(commit))
 
-        command_begin = ["rsync", "-au", "--no-inc-recursive"]
+        command_begin = [
+            "rsync", "-au",
+            # completely meaningless: "--no-inc-recursive"
+            "--link-dest=.ys/commits/{}".format(commit),
+        ]
         if self._args.dry_run:
             command_begin += ["-n"]
         command_begin.extend(["--delete", "-i", "--exclude=/.ys"])
@@ -1033,7 +1037,10 @@ class YARsync():
             raise ValueError("commit {} does not exist".format(comm2))
 
         command = [
-            "rsync", "-aun", "--no-inc-recursive", "--delete", "-i",
+            "rsync", "-aun",
+            # useless now, see comment in _status()
+            # "--no-inc-recursive",
+            "--delete", "-i",
         ]
         # outbuf option added in Rsync 3.1.0 (28 Sep 2013)
         # https://download.samba.org/pub/rsync/NEWS#ENHANCEMENTS-3.1.0
@@ -2105,7 +2112,11 @@ How to merge:
         filter_command, filter_str = self._get_filter(include_commits=False)
 
         command_begin = [
-            "rsync", "-aun", "--no-inc-recursive", "--delete", "-i",
+            "rsync", "-aun",
+            # allow incremental recursion until the implementation of
+            # https://github.com/WayneD/rsync/issues/380
+            # "--no-inc-recursive",
+            "--delete", "-i",
             "--no-group", "--no-owner",
             "--exclude=/.ys"
         ]
@@ -2122,7 +2133,7 @@ How to merge:
         command_str += " --outbuf=L"
 
         root_path = self.root_dir + "/"
-        command_end = [root_path, ref_commit_dir]
+        command_end = ["--link-dest="+ref_commit_dir, root_path, ref_commit_dir]
         command += command_end
         command_str += " " + " ".join(command_end)
 
