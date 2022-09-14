@@ -1821,7 +1821,13 @@ How to merge:
             )
             return returncode
 
-        if new:
+        not_all_commits_exist = not local_commits or not remote_commits
+        if not_all_commits_exist:
+            if not local_commits:
+                self._print("local commits missing")
+            if not remote_commits:
+                self._print("remote commits missing")
+        elif new:
             last_remote_comm = max(remote_commits)
             if last_remote_comm in local_commits:
                 # remote commits are within locals (except some old ones)
