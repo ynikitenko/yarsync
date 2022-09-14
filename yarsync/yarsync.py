@@ -1834,13 +1834,18 @@ How to merge:
             last_remote_comm = max(remote_commits)
             if last_remote_comm in local_commits:
                 # remote commits are within locals (except some old ones)
-                # update the working directory
-                #
-                # Warning: if commits were not pulled completely,
-                # this command will delete some new files
-                # in the working directory!
-                self._checkout(max(local_commits))
-                self._print("remote commits automatically merged")
+                # automatic checkout is forbidden,
+                # because it can delete files in the working directory
+                # despite --new . Examples: uncommitted files,
+                # interrupted (incomplete) commits.
+                # self._checkout(max(local_commits))
+                self._print(
+                    "\nRemote commits can be automatically merged.\n"
+                    "Check the working directory first with\n"
+                    "  yarsync status\n"
+                    "and commit or check out most recent commit:\n"
+                    "  yarsync checkout {}".format(max(local_commits))
+                )
             else:
                 # remote commits diverged, need to merge them manually
                 common_commits = set(local_commits)\
