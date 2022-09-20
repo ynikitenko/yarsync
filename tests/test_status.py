@@ -108,6 +108,7 @@ def test_status_existing_commits(capfd, command, test_dir):
     assert not captured.err
     assert captured.out.endswith(
         'Nothing to commit, working directory clean.\n'
+        'No synchronization directory found.\n'
         'No synchronization information found.\n'
     )
     # assert mocker_print.mock_calls == [

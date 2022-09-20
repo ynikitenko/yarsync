@@ -31,6 +31,8 @@ def test_log_empty(mocker):
     call = mocker.call
     assert res == 0
     assert mocker_print.mock_calls == [
+        call.write('No synchronization directory found.'),
+        call.write('\n'),
         call.write('No synchronization information found.'),
         call.write('\n'),
         call.write('No commits found'), call.write('\n')
@@ -59,6 +61,8 @@ def test_log(mocker):
     time2_str = "Thu, 01 Jan 1970 03:00:02 MSK"
 
     assert mocker_print.mock_calls == [
+        call.write('No synchronization directory found.'),
+        call.write('\n'),
         call.write('No synchronization information found.'),
         call.write('\n'),
         call.write('commit 3 is missing'),
@@ -85,6 +89,8 @@ def test_log(mocker):
     call = mocker.call
     assert res == 0
     assert mocker_print.mock_calls == [
+        call.write('No synchronization directory found.'),
+        call.write('\n'),
         call.write('No synchronization information found.'),
         call.write('\n'),
         call.write('commit 1'),

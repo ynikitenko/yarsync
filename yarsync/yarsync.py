@@ -582,8 +582,9 @@ class YARsync():
         # and group ids, so we don't push extraneous ids there.
         # Used in pull and push (and indirectly in clone).
         self.RSYNCOPTIONS = ["-avH", "--no-owner", "--no-group"]
-        # stores last synchronized commit
-        self.SYNCFILE = os.path.join(self.config_dir, "sync.txt")
+        # stores synchronization information
+        self.SYNCDIR = os.path.join(self.config_dir, "sync")
+        # self.SYNCFILE = os.path.join(self.config_dir, "sync.txt")
 
         ## Check for CONFIGFILE
         # "checkout", "diff", "init", "log", "show", "status"
@@ -1149,18 +1150,32 @@ class YARsync():
             return None
         return max(commits)
 
-    def _get_last_sync(self, verbose=True):
-        try:
-            with open(self.SYNCFILE) as fil:
-                data = fil.readlines()[0].strip()  # remove trailing newline
-                commit, repo = data.split(sep=",", maxsplit=1)
-        except OSError:
+    def _get_sync(self, syncdata=None, verbose=True):
+        """Sync is a mapping {commit -> list of repositories}."""
+        if syncdata is None:
+            try:
+                syncdata = os.listdir(self.SYNCDIR)
+            except FileNotFoundError:  # sybtype of OSError
+                syncdata = []
             # this is not an error
-            # verbose is False for automatic usage.
-            if verbose:
-                self._print("No synchronization information found.")
-            return (None, None)
-        return (int(commit), repo)
+                # verbose is False for automatic usage.
+                if verbose:
+                    self._print("No synchronization directory found.")
+
+        # parse synchronization data
+        sync = {}
+        for sd in syncdata:
+            cm, repo = sd.split('_')
+            commit = int(cm)
+            if commit in sync:
+                sync[commit].append(repo)
+            else:
+                sync[commit] = [repo]
+
+        if not sync and verbose:
+            self._print("No synchronization information found.")
+
+        return sync
 
     def _get_local_commits(self):
         """Return local commits as an iterable of integers."""
@@ -1548,14 +1563,14 @@ How to merge:
             # otherwise the last element is excluded
             commit_log_list = commit_log_list[:max_count]
 
-        synced_commit, remote = self._get_last_sync(verbose=True)
+        sync = self._get_sync(verbose=True)
         head_commit = self._get_head_commit()
 
         def print_logs(commit_log_list):
             for ind, (commit, log) in enumerate(commit_log_list):
                 if ind:
                     print()
-                self._print_log(commit, log, synced_commit, remote, head_commit)
+                self._print_log(commit, log, sync, head_commit)
 
         print_logs(commit_log_list)
 
@@ -1580,8 +1595,7 @@ How to merge:
         # However, _print is used internally - to handle output levels.
         self._print(*args, **kwargs)
 
-    def _print_log(self, commit, log, synced_commit=None, remote=None,
-                   head_commit=None):
+    def _print_log(self, commit, log, sync=None, head_commit=None):
         if commit is None:
             commit_str = "commit {} is missing".format(log)
             commit = log
@@ -1589,8 +1603,9 @@ How to merge:
             commit_str = "commit " + str(commit)
             if commit == head_commit:
                 commit_str += " (HEAD)"
-            if commit == synced_commit:
-                commit_str += " <-> {}".format(remote)
+            if commit in sync:
+                remote_str = ", ".join(sync[commit])
+                commit_str += " <-> {}".format(remote_str)
         if log is None:
             log_str = "Log is missing"
             # time.time is timezone independent.
@@ -1881,20 +1896,29 @@ How to merge:
                     format(max(local_commits), last_remote_comm, common_comm)
                 )
 
+        def _write_sync(self, sync):
+            for commit, repos in sync.items():
+                for repo in repos:
+                    sync_str = "{}_{}".format(commit, repo)
+                    with open(os.path.join(self.SYNCDIR, sync_str), "x"):
+                        # just create this file
+                        pass
+
         if not new and not dry_run:
             # --new means we've not fully synchronized yet
             last_commit = self._get_last_commit()
-            # is it not possible that we have no commits at all,
-            # because that would mean uncommitted changes.
-            # todo: store information about
-            # synchronization with several remotes?
-            sync_str = "{},{}".format(last_commit, remote)
+            # we have some commits,
+            # because otherwise that would mean uncommitted changes.
+            sync = {}
+            if last_commit in sync:
+                sync[last_commit].append(remote)
+            else:
+                sync[last_commit] = [remote]
             try:
-                with open(self.SYNCFILE, "w") as fil:
-                    print(sync_str, end="", file=fil)
+                _write_sync(self, sync)
             except OSError:
                 _print_error("data transferred, but could not log to {}"
-                             .format(self.SYNCFILE))
+                             .format(self.SYNCDIR))
 
             # either HEAD was correct ("not detached") (for push)
             # or it was updated (by pull)
@@ -2047,14 +2071,14 @@ How to merge:
 
         # commit logs can be None
         commits_with_logs = self._make_commit_list(commits=commits)
-        synced_commit, remote = self._get_last_sync(verbose=True)
+        sync = self._get_sync(verbose=True)
 
         for ind, cl in enumerate(commits_with_logs):
             commit, log = cl
             # print log
             if ind:
                 print()
-            self._print_log(commit, log, synced_commit, remote)
+            self._print_log(commit, log, sync)
             # print commit
             commit_ind = all_commits.index(commit)
             if not commit_ind:
@@ -2197,24 +2221,28 @@ How to merge:
             # better formatting
             self._print()
 
-        synced_commit, repo = self._get_last_sync(verbose=not check_changed)
+        sync = self._get_sync(verbose=not check_changed)
 
-        if (synced_commit is not None and repo is not None
-            and not check_changed):
+        if sync and not check_changed:
             # if we only check for changes (to push or pull),
             # we are not interested in the commit synchronization status
             commits = list(self._get_local_commits())
             last_commit = self._get_last_commit(commits)
-            if synced_commit == last_commit:
+            if last_commit in sync:
+                last_repos = ", ".join(sync[last_commit])
                 self._print("\nCommits are up to date with {}."\
-                            .format(repo))
+                            .format(last_repos))
             else:
+                # last synchronized commit is present locally,
+                # if it is present in sync/ .
+                last_synced_commit = max(sync.keys())  # or list(sync)
                 n_newer_commits = sum([1 for comm in commits
-                                       if comm > synced_commit])
+                                       if comm > last_synced_commit])
+                last_repos = ", ".join(sync[last_synced_commit])
                 # here we print a hash
                 # to distinguish this line from others
                 self._print("# local repository is {} commits ahead of {}"\
-                            .format(n_newer_commits, repo))
+                            .format(n_newer_commits, last_repos))
 
         # called from an internal method
         if check_changed:
