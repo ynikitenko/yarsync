@@ -202,6 +202,72 @@ def _mkhostpath(host, path):
     return path
 
 
+class Sync():
+    """Manage synchronizations for different repositories.
+
+    Public fields: by_repos.
+    """
+
+    def __init__(self, sync_list):
+        """*sync_list* is a list of syncronization files in a format
+        <commit>_<repository> .
+        """
+        br = {}
+        for s in sync_list:
+            commit, repo = s.split("_", maxsplit=1)
+            commit = int(commit)
+            # for each repository, store the most recent
+            # synchronized commit.
+            if repo in br:
+                br[repo] = max(commit, br[repo])
+            else:
+                br[repo] = commit
+        # to quickly get synchronized commits, use br.values()
+        # bc = {}
+        # for repo, commit in br.items():
+        #     if commit in bc:
+        #         bc[commit].add(repo)
+        #     else:
+        #         bc[commit] = set((repo,))
+        # self.by_commits = bc
+        self.by_repos = br
+        # outdated commits from other to be removed
+        # sets, because dictionary iteration is arbitrary
+        self.removed = set()
+        self.new = set()
+        # self.repos = frozenset(br)  # keys
+
+    def update(self, other):
+        """Update synchronization information with that from *other*.
+
+        *other* is an iterable of (commit, repo) pairs,
+        for example, *Sync.by_repos.items()*.
+        """
+        br = self.by_repos
+        new = self.new
+        removed = self.removed
+        for repo, commit in other:
+            sync_str = "{}_{}".format(commit, repo)
+            if repo in br:
+                if commit > br[repo]:
+                    br[repo] = commit
+                    new.add(sync_str)
+                elif commit < br[repo]:
+                    removed.add(sync_str)
+            else:
+                br[repo] = commit
+                new.add(sync_str)
+        # bc = {}
+        # for repo, commit in br.items():
+        #     if commit in bc:
+        #         bc[commit].add(repo)
+        #     else:
+        #         bc[commit] = set((repo,))
+        # self.by_commits = bc
+
+        # self.repos = frozenset(br)
+
+
 class YARsync():
     """Synchronize data. Provide configuration and wrap rsync calls."""
 
@@ -713,7 +779,7 @@ class YARsync():
             )
         except OSError:
             raise OSError(
-                "could not read configuration at the repository {}".
+                "could not read configuration in the repository {}".
                 format(repository)
             )
 
@@ -896,13 +962,7 @@ class YARsync():
 
         short_commit_mess = self._args.message
 
-        try:
-            with open(self.REPOFILE) as repofile:
-                reponame = repofile.read()
-        except OSError:
-            # platform.node() just calls socket.gethostname()
-            # with an error check
-            reponame = socket.gethostname()
+        reponame = self._get_repo_name()
 
         username = getpass.getuser()
         time_str = time.strftime(self.DATEFMT, time.localtime())
@@ -1150,33 +1210,6 @@ class YARsync():
             return None
         return max(commits)
 
-    def _get_sync(self, syncdata=None, verbose=True):
-        """Sync is a mapping {commit -> list of repositories}."""
-        if syncdata is None:
-            try:
-                syncdata = os.listdir(self.SYNCDIR)
-            except FileNotFoundError:  # sybtype of OSError
-                syncdata = []
-            # this is not an error
-                # verbose is False for automatic usage.
-                if verbose:
-                    self._print("No synchronization directory found.")
-
-        # parse synchronization data
-        sync = {}
-        for sd in syncdata:
-            cm, repo = sd.split('_')
-            commit = int(cm)
-            if commit in sync:
-                sync[commit].append(repo)
-            else:
-                sync[commit] = [repo]
-
-        if not sync and verbose:
-            self._print("No synchronization information found.")
-
-        return sync
-
     def _get_local_commits(self):
         """Return local commits as an iterable of integers."""
         # todo: cache results.
@@ -1189,41 +1222,84 @@ class YARsync():
             commit_candidates = []
         return list(map(int, filter(_is_commit, commit_candidates)))
 
-    def _get_remote_commits(self, commit_dir, print_level=3):
+    def _get_local_sync(self, syncdata=None, verbose=True):
+        """Get local synchronization information."""
+        if syncdata is None:
+            try:
+                syncdata = os.listdir(self.SYNCDIR)
+            except FileNotFoundError:  # sybtype of OSError
+                syncdata = []
+                # this is not an error
+                # verbose is False for automatic usage.
+                if verbose:
+                    self._print("No synchronization directory found.")
+
+        # parse synchronization data
+        sync = Sync(syncdata)
+
+        if not sync.by_repos and verbose:
+            self._print("No synchronization information found.")
+
+        return sync
+
+    def _get_remote_config(self, config_dir, print_level=3):
         """Return remote commits as a list of integers."""
         try:
-            remote_files = self._get_remote_files(commit_dir, print_level=print_level)
+            remote_files = self._get_remote_files(
+                config_dir, with_commits=True, print_level=print_level
+            )
         except OSError:
             return []
-            # allow a missing commit directory for a new repository
+            # allow a missing .ys directory for a new repository
             # (can simply push local commits there).
             # # detailed error messages are already printed by rsync
             # raise OSError(
-            #     "error during listing remote commits"
+            #     "error while listing remote commits"
             # )
 
         commits = []
-        for comm in remote_files:
-            if not _is_commit(comm):
-                raise OSError(
-                    "not a commit found on remote: {}".format(comm)
-                )
-            commits.append(int(comm))
+        try:
+            cmts = remote_files["commits"]
+        except KeyError:
+            pass
+        else:
+            for comm in cmts:
+                try:
+                    commit = int(comm)
+                except ValueError:
+                    continue
+                    # this is not a crucial error.
+                    # Maybe we'd like to store there a symlink "head"?
+                    # Neither is this checked in local commits.
+                    # raise OSError(
+                    #     "not a commit found on remote: {}".format(comm)
+                    # )
+                commits.append(commit)
 
-        return commits
+        if "sync" in remote_files:
+            sync = Sync(remote_files["sync"])
+        else:
+            sync = Sync([])
 
-    def _get_remote_files(self, path, print_level=3):
+        remote_files["commits"] = commits
+        remote_files["sync"] = sync
+        # leave other files as they are
+
+        return remote_files
+
+    def _get_remote_files(self, path, with_commits=False, print_level=3):
         """Return a list of files at the remote path.
         Path can be one file (why though).
         The result does not contain '.' and '..'.
         Remote can be local.
         """
-        command = ["rsync", "--list-only", path]
-        # Another variant:
-        # "-r --exclude='/*/*'" means
-        # to list a single directory without recursion.
-        # If a pattern ends with a '/',
-        # then it will only match a directory.
+        command = ["rsync", "--list-only"]
+        if with_commits:
+            # list commits, but not their contents
+            command.extend(["-r", "--exclude=/*/*/*", "--exclude=logs/"])
+        command.append(path)
+
+        # no idea what from_path was in that case.
         # command = "rsync -nr --info=NAME --include=/ --exclude=/*/*".split() \
         #           + [from_path, to_path]
         self._print_command(" ".join(command), level=print_level)
@@ -1241,15 +1317,47 @@ class YARsync():
                 .format(returncode)
             )
 
-        files = []
+        files = {}
         for line in iter(sp.stdout.readline, b''):
+            # print(line, line[0])
+            # probably files with a space won't work here.
             fil = line.split()[-1]
-            if fil not in [b'.', b'..']:
-                # make them strings for easier use
-                # and coherent with os.listdir
-                files.append(fil.decode("utf-8"))
+            if fil in [b'.', b'..']:
+                continue
+            # make them strings for easier use
+            # and coherent with os.listdir
+            path = fil.decode("utf-8")
+            # example: commits/1579013756
+            parts = path.split('/')
+            # or pathlib.PurePath(path).parts
+            if len(parts) == 1:
+                if line[0] == 100:  # b'd'
+                    # a directory
+                    dir_ = parts[0]
+                    if dir_ not in files:
+                        files[dir_] = []
+                else:
+                    # a file in .ys
+                    files[path] = None
+            else:
+                dir_ = parts[0]
+                subpath = "/".join(parts[1:])
+                if dir_ in files:
+                    files[dir_].append(subpath)
+                else:
+                    files[dir_] = [subpath]
 
         return files
+
+    def _get_repo_name(self):
+        try:
+            with open(self.REPOFILE) as repofile:
+                reponame = repofile.read()
+        except OSError:
+            # platform.node() just calls socket.gethostname()
+            # with an error check
+            reponame = socket.gethostname()
+        return reponame
 
     def _init(self, reponame, merge=False):
         """Initialize default configuration.
@@ -1563,7 +1671,7 @@ How to merge:
             # otherwise the last element is excluded
             commit_log_list = commit_log_list[:max_count]
 
-        sync = self._get_sync(verbose=True)
+        sync = self._get_local_sync(verbose=True)
         head_commit = self._get_head_commit()
 
         def print_logs(commit_log_list):
@@ -1603,7 +1711,7 @@ How to merge:
             commit_str = "commit " + str(commit)
             if commit == head_commit:
                 commit_str += " (HEAD)"
-            if commit in sync:
+            if commit in sync.by_repos.values():
                 remote_str = ", ".join(sync[commit])
                 commit_str += " <-> {}".format(remote_str)
         if log is None:
@@ -1736,15 +1844,18 @@ How to merge:
 
         # old local commits (before possible pull)
         local_commits = list(self._get_local_commits())
+        local_sync = self._get_local_sync(verbose=True)
 
         # if there are no remote commits (a new repository),
         # push will still work
-        remote_commits_dir = os.path.join(full_destpath, ".ys", "commits/")
-        remote_commits = self._get_remote_commits(
-            remote_commits_dir,
+        remote_config_dir = os.path.join(full_destpath, ".ys/")
+        remote_config = self._get_remote_config(
+            remote_config_dir,
             # don't complain about errors
             print_level=0
         )
+        remote_commits = remote_config["commits"]
+        remote_sync = remote_config["sync"]
 
         # missing_commits can be overwritten by pull or push
         if command_name == "push":
@@ -1789,6 +1900,43 @@ How to merge:
             stdout = subprocess.DEVNULL
 
         self._print_command(command_str, level=3)
+
+        def write_sync(self, sync, verbose=True):
+            if verbose:
+                self._print("update synchronization:")
+            for sync_str in sync.removed:
+                if verbose:
+                    self._print("  remove", sync_str)
+                os.remove(os.path.join(self.SYNCDIR, sync_str))
+            for sync_str in sync.new:
+                if verbose:
+                    self._print("  create", sync_str)
+                if not os.path.exists(self.SYNCDIR):
+                    os.mkdir(self.SYNCDIR)
+                with open(os.path.join(self.SYNCDIR, sync_str), "x"):
+                    # just create this file
+                    pass
+
+        # push synchronization information to the remote
+        if command_name == "push" and not new and not dry_run:
+            # forbid --new sync update,
+            # because it messes all sync together.
+            # Obsolete local sync will be removed.
+            remote_sync.update(local_sync.by_repos.items())
+            last_commit = self._get_last_commit()
+            local_repo = self._get_repo_name()
+            # todo: get remote name from remote .ys/repo_<name>
+            # forbid several files with such name
+            remote_sync.update([
+                (local_repo, last_commit),
+                (remote, last_commit)
+            ])
+            try:
+                write_sync(self, remote_sync)
+            except OSError as err:
+                _print_error("could not log to {}. Abort."
+                             .format(self.SYNCDIR))
+                raise err
 
         # ----------------------------------------------------------
         #         Run
@@ -1896,30 +2044,26 @@ How to merge:
                     format(max(local_commits), last_remote_comm, common_comm)
                 )
 
-        def _write_sync(self, sync):
-            for commit, repos in sync.items():
-                for repo in repos:
-                    sync_str = "{}_{}".format(commit, repo)
-                    with open(os.path.join(self.SYNCDIR, sync_str), "x"):
-                        # just create this file
-                        pass
-
-        if not new and not dry_run:
-            # --new means we've not fully synchronized yet
-            last_commit = self._get_last_commit()
+        # update synchronization information locally
+        if command_name == "pull" and not new and not dry_run:
+            local_sync.update(remote_sync.by_repos.items())
             # we have some commits,
             # because otherwise that would mean uncommitted changes.
-            sync = {}
-            if last_commit in sync:
-                sync[last_commit].append(remote)
-            else:
-                sync[last_commit] = [remote]
+            last_commit = self._get_last_commit()
+            local_repo = self._get_repo_name()
+            # see todo for push
+            local_sync.update([
+                (local_repo, last_commit),
+                (remote, last_commit)
+            ])
             try:
-                _write_sync(self, sync)
-            except OSError:
-                _print_error("data transferred, but could not log to {}"
-                             .format(self.SYNCDIR))
+                write_sync(self, local_sync)
+            except OSError as err:
+                _print_error("data transferred, but could not log to "\
+                             + self.SYNCDIR)
 
+        if not new and not dry_run:
+            # --new means we've not fully synchronized yet.
             # either HEAD was correct ("not detached") (for push)
             # or it was updated (by pull)
             self._update_head()
@@ -2071,7 +2215,7 @@ How to merge:
 
         # commit logs can be None
         commits_with_logs = self._make_commit_list(commits=commits)
-        sync = self._get_sync(verbose=True)
+        sync = self._get_local_sync(verbose=True)
 
         for ind, cl in enumerate(commits_with_logs):
             commit, log = cl
@@ -2221,28 +2365,32 @@ How to merge:
             # better formatting
             self._print()
 
-        sync = self._get_sync(verbose=not check_changed)
+        sync = self._get_local_sync(verbose=not check_changed)
 
         if sync and not check_changed:
             # if we only check for changes (to push or pull),
             # we are not interested in the commit synchronization status
             commits = list(self._get_local_commits())
             last_commit = self._get_last_commit(commits)
-            if last_commit in sync:
+            if last_commit in sync.by_repos.values():
                 last_repos = ", ".join(sync[last_commit])
                 self._print("\nCommits are up to date with {}."\
                             .format(last_repos))
             else:
                 # last synchronized commit is present locally,
                 # if it is present in sync/ .
-                last_synced_commit = max(sync.keys())  # or list(sync)
-                n_newer_commits = sum([1 for comm in commits
-                                       if comm > last_synced_commit])
-                last_repos = ", ".join(sync[last_synced_commit])
-                # here we print a hash
-                # to distinguish this line from others
-                self._print("# local repository is {} commits ahead of {}"\
-                            .format(n_newer_commits, last_repos))
+                synced_commits = sync.by_repos.values()
+                # todo: fix tests or think over this possibility
+                # more thoroughly
+                if synced_commits:
+                    last_synced_commit = max(synced_commits)
+                    n_newer_commits = sum([1 for comm in commits
+                                           if comm > last_synced_commit])
+                    last_repos = ", ".join(sync[last_synced_commit])
+                    # here we print a hash
+                    # to distinguish this line from others
+                    self._print("# local repository is {} commits ahead of {}"\
+                                .format(n_newer_commits, last_repos))
 
         # called from an internal method
         if check_changed:
