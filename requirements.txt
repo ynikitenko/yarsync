@@ -1,5 +1,11 @@
-# development
+## development
 pytest
 coverage
 pytest-cov
 pytest-mock
+## documentation
+sphinx
+# to use Markdown with Sphinx
+myst-parser
+# sphinx theme
+furo

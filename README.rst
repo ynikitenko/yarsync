@@ -60,6 +60,7 @@ and remove the cloned repository.
 --------------------
 Design and features
 --------------------
+
 ``yarsync`` can be used to manage hierarchies of unchanging files,
 such as music, books, articles, photographs, etc.
 Its final goal is to have the same state of files across
@@ -158,6 +159,7 @@ and always do a *--dry-run* (*-n*) first before the actual transfer.
 -------------
 Documentation
 -------------
+
 For the complete documentation, read the installed
 or online `manual <https://ynikitenko.github.io/yarsync/man>`_.
 
@@ -167,9 +169,11 @@ For more in-depth topics or alternatives, see
 An article in Russian that deals more with ``yarsync`` internals was posted
 on `Habr <https://habr.com/ru/post/662163/>`_.
 
--------
+
+------
 Thanks
--------
+------
+
 A good number of people have contributed to the improvement of this software.
 I'd like to express my thanks to
 Mikhail Zelenyy from MIPT NPM for the explanation of

@@ -3,3 +3,5 @@ dist/
 .coverage
 .pyc
 .tox
+tests/.hypothesis/
+docs/build
