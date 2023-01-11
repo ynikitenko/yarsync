@@ -13,53 +13,6 @@ from yarsync.yarsync import (
 from .settings import TEST_DIR
 
 
-@pytest.mark.parametrize(
-    "clone_command",
-    [
-        ["yarsync", "clone", "-o", "test_dir_repo", "-n", "clone"],
-        ["yarsync", "clone"],
-    ]
-)
-def test_clone(tmpdir, clone_command):
-    clone_command.extend([TEST_DIR, tmpdir.__str__()])
-    ys = YARsync(clone_command)
-    returncode = ys()
-    assert not returncode
-
-    # all files were transferred
-    # we compare sets, because the ordering would be different
-    assert set(os.listdir(tmpdir)) == set(os.listdir(TEST_DIR))
-
-    # clone to a non-empty directory is forbidden
-    ys_err = YARsync(clone_command)
-    with pytest.raises(YSCommandError):
-        ys_err()
-
-    ## however, we can clone into its subdirectory!
-    clone_command[-1] += '/'
-    ys_subd = YARsync(clone_command)
-    assert not ys_subd()
-
-    test_dir_name = os.path.split(TEST_DIR)[1]
-    assert test_dir_name in os.listdir(tmpdir)
-    # all configuration was set correctly
-    os.chdir(os.path.join(tmpdir, test_dir_name))
-    ys = YARsync(["yarsync", "remote", "show"])
-
-    if "-o" in clone_command:
-        origin = "test_dir_repo"
-    else:
-        origin = "origin"
-    assert ys._configdict == {
-        origin:
-            {"destpath": TEST_DIR,
-             "path": TEST_DIR}
-    }
-    if "-n" in clone_command:
-        with open(ys.REPOFILE) as repofile:
-            assert repofile.read() == "clone"
-
-
 def test_config(tmp_path):
     # Test real configuration file
     # example configuration is written during the initialisation

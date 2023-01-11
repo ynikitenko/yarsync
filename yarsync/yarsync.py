@@ -148,6 +148,25 @@ def _is_commit(file_name):
     return True
 
 
+def _is_remote(path):
+    """A path is remote (for rsync) if ':' goes before '/'."""
+    # todo: change to _get_remote_host, which returns "" for a local one
+    host_sep = path.find(':')
+    if host_sep == -1:
+        # local
+        return False
+
+    # or '\' for Windows
+    first_dir_sep = path.find('/')
+    if first_dir_sep != -1:
+        # if host_sep > first_dir_sep,
+        # then our local path contain a colon
+        return host_sep < first_dir_sep
+    else:
+        # no path separator
+        return True
+
+
 def _print_error(msg):
     # todo: allow arbitrary number of arguments.
     # not a class method, because it can be run
@@ -352,22 +371,15 @@ class YARsync():
         # clone #
         parser_clone = subparsers.add_parser(
             "clone",
-            help="clone a repository into a new directory"
+            help="clone a repository"
         )
         parser_clone.add_argument(
-            "-o", "--origin", default="origin", metavar="<origin>",
-            help="name of the remote repository (by default 'origin')",
+            "source", metavar="<source>",
+            help="path to the source repository"
         )
         parser_clone.add_argument(
-            "-n", "--name", metavar="<clone>",
-            help="name of the new repository",
-        )
-        parser_clone.add_argument(
-            "repository", metavar="<repository>", help="source repository path"
-        )
-        parser_clone.add_argument(
-            "directory", metavar="<directory>", nargs="?", default="",
-            help="directory with the new cloned repository"
+            "destination", metavar="<destination>",
+            help="path to the cloned repository"
         )
 
         # commit #
@@ -577,32 +589,30 @@ class YARsync():
         self.NAME = os.path.basename(argv[0])  # "yarsync"
         # directory with commits and other metadata
         # (may be updated by command line arguments)
-        CONFIGDIRNAME = ".ys"
-        # default name for most repositories.
-        # Mostly used directly and hardly will be ever changed.
         self.YSDIR = ".ys"
+        _ysdir = self.YSDIR
 
         root_dir = os.path.expanduser(args.root_dir)
         config_dir = os.path.expanduser(args.config_dir)
         if not root_dir and not config_dir:
             if args.command_name == "init":
                 root_dir = "."
-                config_dir = CONFIGDIRNAME
+                config_dir = _ysdir
             elif args.command_name != "clone":
                 # search the current directory and its parents
                 try:
-                    root_dir = _get_root_directory(CONFIGDIRNAME)
+                    root_dir = _get_root_directory(_ysdir)
                 except OSError as err:
                     # config dir not found.
                     _print_error(
                         "fatal: no {} configuration directory {} found".
-                        format(self.NAME, CONFIGDIRNAME) +
+                        format(self.NAME, _ysdir) +
                         "\n  Check that you are inside an existing repository"
                         "\n  or initialize a new repository with '{} init'.".
                         format(self.NAME)
                     )
                     raise err
-                config_dir = os.path.join(root_dir, CONFIGDIRNAME)
+                config_dir = os.path.join(root_dir, _ysdir)
         elif config_dir:
             if not root_dir:
                 # If we are right in the root dir,
@@ -634,15 +644,18 @@ class YARsync():
         # - just skipped (and will be set correctly by the OS).
         # self.DIRMODE = 0o755
 
-        self.COMMITDIR = os.path.join(self.config_dir, "commits")
+        self.COMMITDIRNAME = "commits"
+        self.COMMITDIR = os.path.join(self.config_dir, self.COMMITDIRNAME)
         self.CONFIGFILE = os.path.join(self.config_dir, "config.ini")
         self.DATEFMT = "%a, %d %b %Y %H:%M:%S %Z"
         self.HEADFILE = os.path.join(self.config_dir, "HEAD.txt")
-        self.LOGDIR = os.path.join(self.config_dir, "logs")
+        self.LOGDIRNAME = "logs"
+        self.LOGDIR = os.path.join(self.config_dir, self.LOGDIRNAME)
         self.MERGEFILE = os.path.join(self.config_dir, "MERGE.txt")
         # contains repository name
         self.REPOFILE = os.path.join(self.config_dir, "repository.txt")
-        self.RSYNCFILTER = os.path.join(self.config_dir, "rsync-filter")
+        self.RSYNCFILTERNAME = "rsync-filter"
+        self.RSYNCFILTER = os.path.join(self.config_dir, self.RSYNCFILTERNAME)
         # yarsync repositories are owned by one user.
         # However, different machines can have different user
         # and group ids, so we don't push extraneous ids there.
@@ -705,8 +718,7 @@ class YARsync():
         if args.command_name == "clone":
             self._func = functools.partial(
                 self._clone,
-                repository=args.repository, directory=args.directory,
-                origin=args.origin, name=args.name
+                source=args.source, destination=args.destination,
             )
         elif args.command_name == "init":
             # https://stackoverflow.com/a/41070441/952234
@@ -750,143 +762,93 @@ class YARsync():
 
         self._args = args
 
-    def _clone(self, repository, directory="", origin="origin", name=None):
-        """Clone a yarsync *repository* to a *directory*.
+    def _clone(self, source, destination):
+        """Clone a yarsync *source* to a *destination*.
 
-        The new repository will have the name *name* in self.REPOFILE.
-        The original repository will be added as a remote
-        with the name *origin* to the new one.
+        Only data (working directory, commits and logs)
+        and *rsync-filter* will be cloned.
 
-        Note that only data (working directory, commits and logs,
-        and not any of yarsync configuration files!) will be cloned.
+        *source* or *destination* (not both) can be remote paths.
+        If a remote *source* has an *rsync-filter*, the command fails and
+        an error is raised.
 
-        If the *directory* path ends with a slash,
-        a new repository will be created as its subdirectory
-        with the name taken from the last path element of the
-        source *repository*.
-        Otherwise, the new repository will be the *directory* itself.
-
-        If the path *directory* (or any its parent directories)
-        do not exist, they will be created. If the resulting
-        directory exists and is non-empty, it will be preserved
-        and an error issued.
+        If *source* ends with a slash, its contents are copied
+        inside *destination*, otherwise *source* becomes its subfolder
+        (standard *rsync* semantics).
         """
-
-        ## check that repository has no rsync-filter
+        ## check for rsync-filter in source
         try:
-            remote_configs = self._get_remote_files(
-                os.path.join(repository, self.YSDIR) + '/'
-            )
-        except OSError:
-            raise OSError(
-                "could not read configuration in the repository {}".
-                format(repository)
-            )
-
-        if "rsync-filter" in remote_configs:
-            _print_error(
-                "repository configuration must not contain rsync-filter."
-                " Abort.\n  Repositories with filters can be synchronized "
-                "only as local ones (with pull or push)."
-            )
-            raise YSCommandError()
-
-        if repository.endswith('/'):
-            # ignore trailing slash
-            repository = repository[:-1]
-
-        ## get directory name from the repository path
-        if directory == "" or directory.endswith('/'):
-            # os.path.split(path) returns a (head, tail) pair.
-            # It is important that the path does not end in '/',
-            # or tail will be empty!
-            repo_name = os.path.split(repository)[1]
-            directory = os.path.join(directory, repo_name)
-
-        if ':' not in repository or os.path.exists(repository):
-            ## If the path is local, make it absolute.
-            # Otherwise it will not work when we enter the *directory*.
-            # rsync accepts paths like [USER@]HOST:SRC
-            # todo: this will fail on Windows with C:\...
-            # '~' in the path will be handled by shell.
-            repository = os.path.abspath(repository)
-
-        try:
-            os.makedirs(directory, exist_ok=True)
+            # all os.path.join are incorrect if remote is on Windows.
+            # The path must end with a '/'
+            # for rsync to list directory contents (not its name).
+            source_ys_dir = os.path.join(source, self.YSDIR, "")
+            source_configs = [os.path.split(path)[1]
+                              for path in self._get_remote_files(source_ys_dir)]
         except OSError as err:
-            _print_error("could not create a directory {}. Abort."
-                         .format(directory))
+            raise OSError(
+                "could not read configuration in the repository {} ".
+                format(source) + str(err)
+            )
+
+        source_is_remote = _is_remote(source)
+        has_rsync_filter = self.RSYNCFILTERNAME in source_configs
+
+        if has_rsync_filter and source_is_remote:
+            _print_error(
+                "remote source configuration contains rsync-filter. "
+                "Aborting.\n  "
+                "Only local repositories with filters can be cloned.\n"
+                "  As a workaround, initialize a local repository,"
+                "  copy remote filter locally, add source as a remote\n"
+                "  and pull remote data."
+            )
             raise YSCommandError()
+        elif has_rsync_filter:
+            self._print(
+                "source has an rsync-filter. For a complete synchronization, "
+                "a manual copy of filtered files/directories might be needed."
+            )
 
-        if any(os.scandir(directory)):
-            _print_error("directory {} non-empty. Abort.".format(directory))
-            raise YSCommandError()
-            # it is recommended to close the scandir iterator
-            # https://docs.python.org/3/library/os.html#os.scandir,
-            # but if we return right here, it is not needed
-            # (I don't receive a warning here).
+        # if not source.endswith('/'):
+        #     # add trailing slash
+        #     source += '/'
+        #     # remove trailing slash (it would be meaningless for a repo)
+        #     # source = source[:-1]
 
-        try:
-            # no need to remember the path
-            # (it won't be changed for the user).
-            # old_path = os.getcwd()
-            os.chdir(directory)
-            # todo: what about verbosity?
-            # Probably make _print a separate function for that?
-            command = ["yarsync", "init"]
-            if name is not None:
-                command.append(name)
-            ys = YARsync(command)
-            ys.print_level = self.print_level - 2
-            returncode = ys()
+        command = ["rsync"]
+        command.extend(self.RSYNCOPTIONS)
+        command.append("--no-inc-recursive")
+        filter_, filter_str = self._get_filter(path=source)
+        command.extend(filter_)
 
-            if self.print_level <= 2:
-                # otherwise it will be printed by subcommands
-                init_str = "Initialized a new repository"
-                if name is not None:
-                    init_str += " " + name
-                self._print(init_str, "in {}".format(directory))
+        command.append(source)
+        command.append(destination)
 
-            if returncode:
-                raise YSCommandError(returncode)
-                # We don't exit here but raise,
-                # in order to clean up the created new repository.
+        if self.print_level >= 3:
+            stdout = None
+            command_str = " ".join(command)
+            self._print_command(command_str, level=3)
+        else:
+            # for push and pull we pipe stdout,
+            # but for clone it would be redundant
+            # (one can list all local files with find)
+            stdout = subprocess.DEVNULL
 
-            ys._remote_add(origin, repository)
-            if self.print_level <= 2:
-                self._print("Added a remote '{}' with path {}".
-                            format(origin, repository))
-            # raise YSCommandError(1)
-        except YSCommandError as err:
-            # we import shutil lazily here,
-            # because it is not used in other places
-            # and because this use case is marginal (not likely).
-            import shutil
-            # don't remove the base 'directory',
-            # because it could be created before us.
-            # It is safer to remove only .ys .
-            # Since ys is initialized without any config-dir options,
-            # this should be safe.
-            ysdir = ys.config_dir
-            # this is wrong for ysdir, since we already entered the directory
-            ysdir_full_path = os.path.join(directory, ys.config_dir)
-            # Cleaning up the directory allows to repeat the clone command
-            # without errors.
-            self._print("Cleaning up. Removing '{}'...".
-                        format(ysdir_full_path))
-            # one could only remove the .ys dir and the few config files
-            # explicitly.
-            shutil.rmtree(ysdir)
-            self._print("Done.")
-            # print("Removed {}.".format(ysdir))
-            raise err
+        # todo: create sync locally. Write it.
 
-        # todo: can we make pull or push accepting arguments?
-        # Or should we fix self._args to reuse the existing object?
-        ys_pull = YARsync(["yarsync", "pull", origin])
-        ys_pull.print_level = self.print_level - 2
-        returncode = ys_pull()
-        self._print("\n{} cloned.".format(origin))
+        # run rsync
+        completed_process = subprocess.Popen(command, stdout=stdout)
+        completed_process.wait()
+        returncode = completed_process.returncode
+
+        if returncode:
+            _print_error(
+                "an error occurred, rsync returned {}. Exit".
+                format(returncode)
+            )
+            return returncode
+
+        self._print("\n{} cloned.".format(source))
         return returncode
 
     def _checkout(self, commit=None):
@@ -1159,16 +1121,31 @@ class YARsync():
 
         return destpath
 
-    def _get_filter(self, include_commits=True):
-        # todo: .ys, commits and logs should not be fixed here.
-        if os.path.exists(self.RSYNCFILTER):
-            filter_ = ["--filter=merge {}".format(self.RSYNCFILTER)]
-            filter_str = "--filter='merge {}'".format(self.RSYNCFILTER)
+    def _get_filter(self, path="", include_commits=True):
+        """Get filters to be used during synchronization.
+
+        If *path* is non-empty,
+        filters and configuration are relative to that path.
+        """
+        if path:
+            rsync_filter = os.path.join(path, self.YSDIR, self.RSYNCFILTERNAME)
+        else:
+            rsync_filter = self.RSYNCFILTER
+
+        if os.path.exists(rsync_filter):
+            # for merge filter rsync requires a full path,
+            # while for include/exclude only relative ones
+            filter_ = ["--filter=merge {}".format(rsync_filter)]
+            filter_str = "--filter='merge {}'".format(rsync_filter)
         else:
             filter_ = []
             filter_str = ""
         if include_commits:
-            includes = ["/.ys/commits", "/.ys/logs"]
+            includes = [
+                "/".join([self.YSDIR, self.COMMITDIRNAME]),
+                "/".join([self.YSDIR, self.LOGDIRNAME]),
+                # "/.ys/logs"
+            ]
             include_commands = ["--include={}".format(inc) for inc in includes]
             # since we don't have spaces in the command,
             # single ticks are not necessary

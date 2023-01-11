@@ -40,10 +40,12 @@ def test_pull_push_uncommitted(
 
 @pytest.mark.parametrize("backup_dir", [True, False])
 def test_backup(tmp_path_factory, backup_dir, test_dir):
+    # important for proper cloning
+    test_dir += os.path.sep
     local_path = tmp_path_factory.mktemp("local")
     remote_path = tmp_path_factory.mktemp("remote")
-    local = local_path.__str__()
-    remote = remote_path.__str__()
+    local = local_path.__str__() + os.path.sep
+    remote = remote_path.__str__() + os.path.sep
 
     ## clone test_dir -> remote -> local
     # now local has remote as an "origin" remote
@@ -59,6 +61,8 @@ def test_backup(tmp_path_factory, backup_dir, test_dir):
     local_d.write_text("c\n")
 
     os.chdir(local)
+    YARsync(["yarsync", "init"])()
+    YARsync(["yarsync", "remote", "add", "origin", remote])()
     ys_push = YARsync(["yarsync", "push", "origin"])
     # if you have problems during push because of uncommitted changes,
     # this might be because of hard links broken by git.
