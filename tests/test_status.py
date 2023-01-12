@@ -97,7 +97,6 @@ def test_status_existing_commits(capfd, command, test_dir):
     res = ys()
     # we don't check for the exact rsync message here, only for results.
     # # filter is needed, because not only .ys can be excluded
-    # filter_str = ys._get_filter(include_commits=False)[1]
     assert res == 0
 
     ## stdout is correct

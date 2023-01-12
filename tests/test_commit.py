@@ -57,7 +57,7 @@ def test_commit(mocker):
 
     # call _commit
     res = ys()
-    filter_ = ys._get_filter(include_commits=False)[0]
+    filter_ = ys._get_filter(include_commits=False)
     call = mocker.call
 
     assert res == 0

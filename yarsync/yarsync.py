@@ -818,7 +818,8 @@ class YARsync():
         command = ["rsync"]
         command.extend(self.RSYNCOPTIONS)
         command.append("--no-inc-recursive")
-        filter_, filter_str = self._get_filter(path=source)
+        # todo: include rsync-filter into the transferred set!
+        filter_ = self._get_filter(path=source)
         command.extend(filter_)
 
         command.append(source)
@@ -826,8 +827,7 @@ class YARsync():
 
         if self.print_level >= 3:
             stdout = None
-            command_str = " ".join(command)
-            self._print_command(command_str, level=3)
+            self._print_command(command, level=3)
         else:
             # for push and pull we pipe stdout,
             # but for clone it would be redundant
@@ -878,25 +878,19 @@ class YARsync():
         if self._args.dry_run:
             command_begin += ["-n"]
         command_begin.extend(["--delete", "-i", "--exclude=/.ys"])
-        command_str = " ".join(command_begin)
 
-        filter_command, filter_str = self._get_filter(include_commits=False)
+        filter_command = self._get_filter(include_commits=False)
         command = command_begin + filter_command
-        if filter_str:
-            command_str += " " + filter_str
 
         # outbuf option added in Rsync 3.1.0 (28 Sep 2013)
         # https://download.samba.org/pub/rsync/NEWS#ENHANCEMENTS-3.1.0
         # from https://stackoverflow.com/a/35775429
         command.append('--outbuf=L')
-        command_str += " --outbuf=L"
 
-        command_end = [commit_dir + '/', self.root_dir]
-        command += command_end
-        command_str += " " + " ".join(command_end)
+        command += [commit_dir + '/', self.root_dir]
 
         if verbose:
-            self._print_command(command_str)
+            self._print_command(command)
             sp = subprocess.run(command)
         else:
             sp = subprocess.run(command, stdout=subprocess.PIPE)
@@ -965,23 +959,19 @@ class YARsync():
 
         # exclude .ys, otherwise an empty .ys/ will appear in the commit
         command = ["rsync", "-a", "--link-dest=../../..", "--exclude=/.ys"]
-        full_command_str = " ".join(command)
 
-        filter_list, filter_str = self._get_filter(include_commits=False)
+        filter_list = self._get_filter(include_commits=False)
         command.extend(filter_list)
-        if filter_str:
-            full_command_str += " " + filter_str
+
         # the trailing slash is very important for rsync
         # on Windows the separator is the same for rsync.
         # https://stackoverflow.com/a/59987187/952234
         # However, this may or may not work in cygwin
         # https://stackoverflow.com/a/18797771/952234
         root_dir = self.root_dir + '/'
-        command.append(root_dir)
-        command.append(commit_dir_tmp)
-        full_command_str += " " + root_dir + " " + commit_dir_tmp
+        command.extend([root_dir, commit_dir_tmp])
 
-        self._print_command(full_command_str)
+        self._print_command(command)
         if self.print_level >= 3:
             # with run there will be problems during testing
             completed_process = subprocess.Popen(command)
@@ -1075,7 +1065,7 @@ class YARsync():
         command += [comm2_dir + '/', comm1_dir]
 
         if verbose:
-            self._print_command(*command)
+            self._print_command(command)
 
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
         for line in iter(sp.stdout.readline, b''):
@@ -1136,10 +1126,8 @@ class YARsync():
             # for merge filter rsync requires a full path,
             # while for include/exclude only relative ones
             filter_ = ["--filter=merge {}".format(rsync_filter)]
-            filter_str = "--filter='merge {}'".format(rsync_filter)
         else:
             filter_ = []
-            filter_str = ""
         if include_commits:
             includes = [
                 "/".join([self.YSDIR, self.COMMITDIRNAME]),
@@ -1149,24 +1137,15 @@ class YARsync():
             include_commands = ["--include={}".format(inc) for inc in includes]
             # since we don't have spaces in the command,
             # single ticks are not necessary
-            include_command_str = " ".join(["--include={}".format(inc)
-                                            for inc in includes])
             filter_ += include_commands
-            if filter_str:
-                # otherwise an empty string will be joined by a space
-                filter_str = " ".join([filter_str, include_command_str])
-            else:
-                filter_str = include_command_str
+
         # exclude can go before or after include,
         # because the first matching rule is applied.
         # It's important to place /* after .ys,
         # because it means files exactly one level below .ys
         filter_ += ["--exclude=/.ys/*"]
-        if filter_str:
-            filter_str += " "
-        filter_str += "--exclude=/.ys/*"
-        # print("filter_str: '{}'".format(filter_str))
-        return (filter_, filter_str)
+
+        return filter_
 
     def _get_head_commit(self):
         try:
@@ -1665,20 +1644,40 @@ How to merge:
         # in fact, sys.exit(None) still returns 0 to the shell
         return 0
 
-    def _print(self, *args, level=1, **kwargs):
+    def _print(self, *args, level=None, **kwargs):
         """Print output messages."""
+
+        # in other print functions we use default level as None
+        if level is None:
+            level = 1
+
         if level > self.print_level:
             return
         if level >= 2:
             print("# ", end='')
         print(*args, **kwargs)
 
-    def _print_command(self, *args, **kwargs):
+    def _print_command(self, command, level=None):
         """Print called commands."""
         # A separate function to semantically distinguish that
         # from _print in code.
         # However, _print is used internally - to handle output levels.
-        self._print(*args, **kwargs)
+
+        def command_str(command):
+            for comm in command:
+                if ' ' in comm:
+                    # can be present for
+                    # --filter='merge test_dir_filter/.ys/rsync-filter'
+                    # Alternatively, one can put '' to the right of '='
+                    yield "'{}'".format(comm)
+                else:
+                    yield comm
+
+        if isinstance(command, str):
+            self._print(command, level=level)
+        else:
+            # list
+            self._print(" ".join(command_str(command)), level=level)
 
     def _print_log(self, commit, log, sync=None, head_commit=None):
         if commit is None:
@@ -1776,25 +1775,20 @@ How to merge:
         dry_run = self._args.dry_run
         if dry_run:
             command.append("-n")
-        command_str = " ".join(command)
 
         command.append("--no-inc-recursive")
         if not new:
             command.append("--delete")
-            command_str += " --delete"
 
         if backup:
             if backup_dir:
                 # create a full hierarchy in the backup_dir
                 command.extend(["--backup-dir", backup_dir])
-                # may contain spaces, ignore.
-                command_str += " --backup-dir " + backup_dir
             # --backup is implied during --backup-dir
             # only since this pull request in 2020
             # https://github.com/WayneD/rsync/pull/35
             # write new files near originals
             command.append("--backup")
-            command_str += " --backup"
         # allow after a fix of https://github.com/WayneD/rsync/issues/357
         # elif not overwrite:
         #     command.append("--ignore-existing")
@@ -1803,21 +1797,15 @@ How to merge:
         # we don't include commits (filter them in)
         # only if we do backups
         include_commits = not backup
-        # if there exists .ys/rsync-filter, command string needs quotes
-        filter_, filter_str = self._get_filter(include_commits=include_commits)
+        filter_ = self._get_filter(include_commits=include_commits)
         command.extend(filter_)
-        command_str += " " + filter_str
 
         root_path = self.root_dir + "/"
         if command_name == "push":
-            command.append(root_path)
-            command.append(full_destpath)
-            command_str += " {} {}".format(root_path, full_destpath)
+            command.extend([root_path, full_destpath])
         else:
             # pull
-            command.append(full_destpath)
-            command.append(root_path)
-            command_str += " {} {}".format(full_destpath, root_path)
+            command.extend([full_destpath, root_path])
 
         # old local commits (before possible pull)
         local_commits = list(self._get_local_commits())
@@ -1876,7 +1864,7 @@ How to merge:
         else:
             stdout = subprocess.DEVNULL
 
-        self._print_command(command_str, level=3)
+        self._print_command(command, level=3)
 
         def write_sync(self, sync, verbose=True):
             if verbose:
@@ -2254,9 +2242,7 @@ How to merge:
         else:
             ref_commit_dir = os.path.join(self.COMMITDIR, str(head_commit))
 
-        filter_command, filter_str = self._get_filter(include_commits=False)
-
-        command_begin = [
+        command = [
             "rsync", "-aun",
             # allow incremental recursion until the implementation of
             # https://github.com/WayneD/rsync/issues/380
@@ -2265,25 +2251,20 @@ How to merge:
             "--no-group", "--no-owner",
             "--exclude=/.ys"
         ]
-        command_str = " ".join(command_begin)
 
-        command = command_begin + filter_command
-        if filter_str:
-            command_str += " " + filter_str
+        filter_command = self._get_filter(include_commits=False)
+        command += filter_command
 
         # outbuf option added in Rsync 3.1.0 (28 Sep 2013)
         # https://download.samba.org/pub/rsync/NEWS#ENHANCEMENTS-3.1.0
         # from https://stackoverflow.com/a/35775429
         command.append('--outbuf=L')
-        command_str += " --outbuf=L"
 
         root_path = self.root_dir + "/"
-        command_end = ["--link-dest="+ref_commit_dir, root_path, ref_commit_dir]
-        command += command_end
-        command_str += " " + " ".join(command_end)
+        command += ["--link-dest="+ref_commit_dir, root_path, ref_commit_dir]
 
         if not check_changed:
-            self._print(command_str, level=3)
+            self._print_command(command, level=3)
 
         # default stderr (None) outputs to parent's stderr
         sp = subprocess.Popen(command, stdout=subprocess.PIPE)
@@ -2299,6 +2280,8 @@ How to merge:
         lines = iter(sp.stdout.readline, b'')
         for line in lines:
             if line:
+                # todo efficiency: check print levels beforehand,
+                # not for each line (as done with _print)
                 # if not check_changed:
                 self._print("Changed since head commit:\n")
                 # skip permission changes

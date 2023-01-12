@@ -147,3 +147,23 @@ def test_print(mocker):
     mocker_print.reset_mock()
     ys._print("debug unavailable", level=2)
     assert mocker_print.mock_calls == []
+
+
+def test_print_command(capfd):
+    os.chdir(TEST_DIR)
+    args = ["yarsync", "log"]
+    ys = YARsync(args)  # command is not called
+
+    # any string command is printed as it is
+    command_str = "just a string, will be unchanged"
+    ys._print_command(command_str)
+
+    captured = capfd.readouterr()
+    assert not captured.err
+    assert command_str + '\n' == captured.out
+
+    command = ["this", "should be quoted"]
+    ys._print_command(command)
+    captured = capfd.readouterr()
+    assert not captured.err
+    assert captured.out == "this 'should be quoted'\n"
