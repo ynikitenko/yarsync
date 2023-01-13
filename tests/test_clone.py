@@ -50,7 +50,8 @@ def test_clone_2(tmpdir, capfd, test_dir_ys_bad_permissions):
         ys1._clone(src1, dest1)
 
     captured = capfd.readouterr()
-    assert 'rsync: [sender] change_dir ' in captured.err
+    assert ('rsync: [sender] change_dir ' in captured.err 
+	    or 'rsync: change_dir ' in captured.err)
     assert 'failed: No such file or directory' in captured.err
 
     # todo: no idea how to efficiently test remotes
@@ -61,7 +62,8 @@ def test_clone_2(tmpdir, capfd, test_dir_ys_bad_permissions):
     rsync_return = 23
     assert ys2._clone(src2, dest1) == rsync_return
     captured = capfd.readouterr()
-    assert "rsync: [sender] opendir " in captured.err
+    assert ("rsync: [sender] opendir " in captured.err or
+            "rsync: opendir " in captured.err)
     assert 'forbidden" failed: Permission denied' in captured.err
     # print("ERR:", captured.err)
     # print("OUT:", captured.out)
