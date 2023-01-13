@@ -933,7 +933,7 @@ class YARsync():
 
         return sp.returncode
 
-    def _commit(self, limit=None, message="", check_commit_limit=True):
+    def _commit(self, limit=None, message=""):
         """Commit the working directory and create a log.
 
         Commit name is based on UNIX time.
@@ -961,6 +961,9 @@ class YARsync():
             message += "Merge {} and {} (common commit {})\n"\
                        .format(*merges)
 
+
+        if limit is not None:
+            message += "Setting commit limit to {}.\n".format(limit)
         message += log_str
 
         if not os.path.exists(self.COMMITDIR):
@@ -1045,10 +1048,10 @@ class YARsync():
         self._update_head()
 
         if limit is None:
-            commit_limit = self._get_commit_limit()
-            if commit_limit is None:
+            repo_commit_limit = self._get_commit_limit()
+            if repo_commit_limit is None:
                 return 0
-            limit = commit_limit
+            limit = repo_commit_limit
             cl_from_file = True
         else:
             cl_from_file = False
@@ -1914,7 +1917,8 @@ How to merge:
         missing_commits = [comm for comm in dest_commits
                            if comm not in _source_commits]
 
-        if not (force or new) and missing_commits:
+        commit_limit = self._get_commit_limit()
+        if not (force or new or commit_limit is not None) and missing_commits:
             missing_commits_str = ", ".join(map(str, missing_commits))
             raise OSError(
                 "\ndestination has commits missing on source: {}, "\
@@ -2380,6 +2384,11 @@ How to merge:
         # because it will be converted to 0.
         # For testing, it is better to have it 0 here.
         returncode = sp.returncode
+
+        commit_limit = self._get_commit_limit()
+        if commit_limit is not None:
+            self._print("\nMaximum number of commits is limited to {}"\
+                        .format(commit_limit))
 
         if head_commit is not None:
             self._print("\nDetached HEAD (see '{} log' for more recent commits)"
