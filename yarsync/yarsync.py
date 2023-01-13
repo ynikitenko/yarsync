@@ -11,6 +11,8 @@ import io
 import json
 import os
 import re
+# rmtree
+import shutil
 # for host name
 import socket
 import subprocess
@@ -112,6 +114,18 @@ CONFIG_EXAMPLE = """\
 ######################
 ## Helper functions ##
 ######################
+
+def _check_positive(value):
+    """Convert a string *value* to a natural number or raise."""
+    # based on https://stackoverflow.com/a/14117511/952234
+    err = argparse.ArgumentTypeError("must be a natural number")
+    try:
+        natural_num = int(value)
+    except ValueError:
+        raise err
+    if natural_num <= 0:
+        raise err
+    return natural_num
 
 
 def _get_root_directory(config_dir_name):
@@ -383,17 +397,6 @@ class YARsync():
         )
 
         # commit #
-        def check_positive(value):
-            # based on https://stackoverflow.com/a/14117511/952234
-            err = argparse.ArgumentTypeError("must be a natural number")
-            try:
-                natural_num = int(value)
-            except ValueError:
-                raise err
-            if natural_num <= 0:
-                raise err
-            return natural_num
-
         parser_commit = subparsers.add_parser(
             "commit", help="commit the working directory"
         )
@@ -402,7 +405,7 @@ class YARsync():
             help="a string with the commit message"
         )
         parser_commit.add_argument(
-            "--limit", metavar="<number>", type=check_positive,
+            "--limit", metavar="<number>", type=_check_positive,
             help="maximum number of commits"
         )
 
@@ -663,7 +666,9 @@ class YARsync():
         self.CONFIGFILE = os.path.join(self.config_dir, "config.ini")
         self.DATEFMT = "%a, %d %b %Y %H:%M:%S %Z"
         self.HEADFILE = os.path.join(self.config_dir, "HEAD.txt")
-        self.COMMITLIMITNAME = "COMMIT_LIMIT_"
+        self.COMMITLIMITNAME = "COMMIT_LIMIT.txt"
+        self.COMMITLIMITFILE = os.path.join(self.config_dir,
+                                            self.COMMITLIMITNAME)
         self.LOGDIRNAME = "logs"
         self.LOGDIR = os.path.join(self.config_dir, self.LOGDIRNAME)
         self.MERGEFILE = os.path.join(self.config_dir, "MERGE.txt")
@@ -928,13 +933,14 @@ class YARsync():
 
         return sp.returncode
 
-    def _commit(self, limit=None, message=""):
-        """Commit the working directory and create a log."""
-        # commit directory name is based on UNIX time
-        # date = datetime.date.today()
-        # date_str = "{}{:#02}{:#02}"\
-        #            .format(date.year, date.month, date.day)
-        # print(date_str)
+    def _commit(self, limit=None, message="", check_commit_limit=True):
+        """Commit the working directory and create a log.
+
+        Commit name is based on UNIX time.
+
+        If there are more commits than *limit*,
+        older commits and logs will be removed.
+        """
 
         reponame = self._get_repo_name()
 
@@ -953,7 +959,7 @@ class YARsync():
                 merge_str = fil.readlines()[0].strip()
             merges = merge_str.split(',')
             message += "Merge {} and {} (common commit {})\n"\
-                                 .format(*merges)
+                       .format(*merges)
 
         message += log_str
 
@@ -968,9 +974,10 @@ class YARsync():
         # We don't want rsync to write twice to one commit
         # even though it's hard to imagine how this could be possible
         # (probably broken clock?)
+        # todo: improve concurrency.
         if os.path.exists(commit_dir):
             raise RuntimeError("commit {} exists".format(commit_dir))
-        elif os.path.exists(commit_dir_tmp):
+        if os.path.exists(commit_dir_tmp):
             raise RuntimeError(
                 "temporary commit {} exists".format(commit_dir_tmp)
             )
@@ -1037,6 +1044,38 @@ class YARsync():
         # if we were not at HEAD, move that now
         self._update_head()
 
+        if limit is None:
+            commit_limit = self._get_commit_limit()
+            if commit_limit is None:
+                return 0
+            limit = commit_limit
+            cl_from_file = True
+        else:
+            cl_from_file = False
+
+        ## limit commits
+        commits = sorted(self._get_local_commits())
+        ncommits = len(commits)
+
+        if ncommits > limit:
+            delete_commits = commits[:ncommits - limit]
+            for comm in delete_commits:
+                comm_path = os.path.join(self.COMMITDIR, str(comm))
+                log_path = os.path.join(self.LOGDIR, str(comm) + ".txt")
+
+                self._print("removing commit {}".format(comm))
+                shutil.rmtree(comm_path)
+                try:
+                    os.remove(log_path)
+                except FileNotFoundError:
+                    pass
+            self._print("removed older commits with logs")
+
+        # make commit limit persistent
+        if not cl_from_file:
+            with open(self.COMMITLIMITFILE, "w") as fil:
+                fil.write(str(limit))
+
         return 0
 
     def _diff(self, commit1=None, commit2=None, verbose=True):
@@ -1090,6 +1129,23 @@ class YARsync():
 
         return sp.returncode
 
+    def _get_commit_limit(self):
+        try:
+            with open(self.COMMITLIMITFILE) as fil:
+                cl_content = fil.readline()
+        except FileNotFoundError:
+            return None
+
+        try:
+            commit_limit = _check_positive(cl_content)
+        except argparse.ArgumentTypeError:
+            raise YSConfigurationError(
+                msg="commit limit must be a natural number."
+                "{} contains {}".format(self.COMMITLIMITFILE, cl_content)
+            )
+
+        return commit_limit
+
     def _get_dest_path(self, dest=None):
         """Return a pair *(host, destpath)*, where
         *host* is a real host (its ip/name/etc.) at the destination
@@ -1131,8 +1187,7 @@ class YARsync():
     def _get_filter(self, path="", include_commits=True):
         """Get filters to be used during synchronization.
 
-        If *path* is non-empty,
-        filters and configuration are relative to that path.
+        If *path* is non-empty, filters are relative to that path.
         """
         if path:
             rsync_filter = os.path.join(path, self.YSDIR, self.RSYNCFILTERNAME)
@@ -1925,6 +1980,7 @@ How to merge:
         completed_process = subprocess.Popen(command, stdout=stdout)
         # ----------------------------------------------------------
 
+        _ysdir = self.YSDIR
         if self.print_level == 2:
             # if we transfer a whole commit, merge all its output into one line.
             # Print transfers only for the working directory and existing commits.
@@ -1933,7 +1989,7 @@ How to merge:
             for line in iter(completed_process.stdout.readline, b''):
                 # iteration copied from https://stackoverflow.com/a/1606870/952234
                 # Not self.COMMITDIR, because it involves the complete path.
-                COMMITDIR = os.path.join(".ys", "commits")
+                COMMITDIR = os.path.join(_ysdir, "commits")
                 if line.startswith(bytes(COMMITDIR, "utf-8")):
                     # commits
                     com_start = len(COMMITDIR) + 1
