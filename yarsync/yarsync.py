@@ -383,6 +383,17 @@ class YARsync():
         )
 
         # commit #
+        def check_positive(value):
+            # based on https://stackoverflow.com/a/14117511/952234
+            err = argparse.ArgumentTypeError("must be a natural number")
+            try:
+                natural_num = int(value)
+            except ValueError:
+                raise err
+            if natural_num <= 0:
+                raise err
+            return natural_num
+
         parser_commit = subparsers.add_parser(
             "commit", help="commit the working directory"
         )
@@ -390,20 +401,23 @@ class YARsync():
             "-m", "--message", metavar="<message>", default="",
             help="a string with the commit message"
         )
-        parser_commit.set_defaults(func=self._commit)
+        parser_commit.add_argument(
+            "--limit", metavar="<number>", type=check_positive,
+            help="maximum number of commits"
+        )
 
         # diff #
-        parser_status = subparsers.add_parser(
+        parser_diff = subparsers.add_parser(
             "diff", help="print the difference between two commits"
         )
-        parser_status.add_argument(
+        parser_diff.add_argument(
             "commit", metavar="<commit>", help="commit name"
         )
-        parser_status.add_argument(
+        parser_diff.add_argument(
             "other_commit", metavar="<commit>", nargs="?", default=None,
             help="other commit name"
         )
-        parser_status.set_defaults(func=self._diff)
+        parser_diff.set_defaults(func=self._diff)
 
         # init #
         parser_init = subparsers.add_parser("init",
@@ -649,6 +663,7 @@ class YARsync():
         self.CONFIGFILE = os.path.join(self.config_dir, "config.ini")
         self.DATEFMT = "%a, %d %b %Y %H:%M:%S %Z"
         self.HEADFILE = os.path.join(self.config_dir, "HEAD.txt")
+        self.COMMITLIMITNAME = "COMMIT_LIMIT_"
         self.LOGDIRNAME = "logs"
         self.LOGDIR = os.path.join(self.config_dir, self.LOGDIRNAME)
         self.MERGEFILE = os.path.join(self.config_dir, "MERGE.txt")
@@ -715,7 +730,12 @@ class YARsync():
 
         # there is no easy way to set a default command
         # for a subparser, https://stackoverflow.com/a/46964652/952234
-        if args.command_name == "clone":
+        if args.command_name == "commit":
+            self._func = functools.partial(
+                self._commit,
+                limit=args.limit, message=args.message
+            )
+        elif args.command_name == "clone":
             self._func = functools.partial(
                 self._clone,
                 source=args.source, destination=args.destination,
@@ -908,15 +928,13 @@ class YARsync():
 
         return sp.returncode
 
-    def _commit(self):
+    def _commit(self, limit=None, message=""):
         """Commit the working directory and create a log."""
         # commit directory name is based on UNIX time
         # date = datetime.date.today()
         # date_str = "{}{:#02}{:#02}"\
         #            .format(date.year, date.month, date.day)
         # print(date_str)
-
-        short_commit_mess = self._args.message
 
         reponame = self._get_repo_name()
 
@@ -926,18 +944,18 @@ class YARsync():
         log_str = "When: {date}\nWhere: {user}@{repo}".format(
             date=time_str, user=username, repo=reponame
         )
-        if short_commit_mess:
-            short_commit_mess += "\n\n"
+        if message:
+            message += "\n\n"
 
         if os.path.exists(self.MERGEFILE):
             # copied from _status
             with open(self.MERGEFILE, "r") as fil:
                 merge_str = fil.readlines()[0].strip()
             merges = merge_str.split(',')
-            short_commit_mess += "Merge {} and {} (common commit {})\n"\
+            message += "Merge {} and {} (common commit {})\n"\
                                  .format(*merges)
 
-        short_commit_mess += log_str
+        message += log_str
 
         if not os.path.exists(self.COMMITDIR):
             os.mkdir(self.COMMITDIR)
@@ -1002,13 +1020,12 @@ class YARsync():
 
         # write log file
         with open(commit_log_name, "w") as commit_file:
-            print(short_commit_mess, file=commit_file)
+            print(message, file=commit_file)
 
         # print to stdout
         self._print(
             "commit {} created\n\n".format(commit_name),
-            short_commit_mess,
-            sep=""
+            message, sep=""
         )
 
         try:
