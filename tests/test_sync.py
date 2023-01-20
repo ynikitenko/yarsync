@@ -1,7 +1,8 @@
 import os
+import pytest
 
 from yarsync import YARsync
-from yarsync.yarsync import Sync
+from yarsync.yarsync import _Sync as Sync, YSConfigurationError
 # from .settings import (
 #     TEST_DIR, TEST_DIR_EMPTY, YSDIR, TEST_DIR_YS_BAD_PERMISSIONS
 # )
@@ -15,6 +16,7 @@ def test_sync():
         "2_a"
     ]
     s0 = Sync(sync_list)
+
     assert s0.by_repos == {
         "a": 2,
         "b2": 1,
@@ -52,3 +54,16 @@ def test_sync():
     assert s0.by_repos == repos1
     assert s0.removed == removed1
     assert s0.new == new1
+
+    # incorrect commit number raises
+    with pytest.raises(YSConfigurationError):
+        Sync(["a_a"])
+
+
+def test_sync_bool():
+    # False for an empty synchronization
+    assert not Sync([])
+
+    # True if there is data
+    sync_list = ["1_a"]
+    assert Sync(sync_list)

@@ -235,7 +235,7 @@ def _mkhostpath(host, path):
     return path
 
 
-class Sync():
+class _Sync():
     """Manage synchronizations for different repositories.
 
     Public fields: by_repos.
@@ -248,21 +248,22 @@ class Sync():
         br = {}
         for s in sync_list:
             commit, repo = s.split("_", maxsplit=1)
-            commit = int(commit)
+            try:
+                commit = _check_positive(commit)
+            except argparse.ArgumentTypeError:
+                raise YSConfigurationError(
+                    msg="commit must be a natural number. {} found"\
+                    .format(commit)
+                )
             # for each repository, store the most recent
             # synchronized commit.
             if repo in br:
                 br[repo] = max(commit, br[repo])
             else:
                 br[repo] = commit
-        # to quickly get synchronized commits, use br.values()
-        # bc = {}
-        # for repo, commit in br.items():
-        #     if commit in bc:
-        #         bc[commit].add(repo)
-        #     else:
-        #         bc[commit] = set((repo,))
-        # self.by_commits = bc
+
+        # to quickly get all synchronized commits, use br.values()
+
         self.by_repos = br
         # outdated commits from other to be removed
         # sets, because dictionary iteration is arbitrary
@@ -270,11 +271,26 @@ class Sync():
         self.new = set()
         # self.repos = frozenset(br)  # keys
 
+    def __bool__(self):
+        # dictionary is True <=> non-empty
+        return bool(self.by_repos)
+
+    @property
+    def by_commits(self):
+        bc = {}
+        for repo, commit in self.by_repos.items():
+            if commit in bc:
+                bc[commit].add(repo)
+            else:
+                bc[commit] = set((repo,))
+
+        return bc
+
     def update(self, other):
         """Update synchronization information with that from *other*.
 
         *other* is an iterable of (commit, repo) pairs,
-        for example, *Sync.by_repos.items()*.
+        for example, *_Sync.by_repos.items()*.
         """
         br = self.by_repos
         new = self.new
@@ -290,15 +306,6 @@ class Sync():
             else:
                 br[repo] = commit
                 new.add(sync_str)
-        # bc = {}
-        # for repo, commit in br.items():
-        #     if commit in bc:
-        #         bc[commit].add(repo)
-        #     else:
-        #         bc[commit] = set((repo,))
-        # self.by_commits = bc
-
-        # self.repos = frozenset(br)
 
 
 class YARsync():
@@ -1143,7 +1150,7 @@ class YARsync():
             commit_limit = _check_positive(cl_content)
         except argparse.ArgumentTypeError:
             raise YSConfigurationError(
-                msg="commit limit must be a natural number."
+                msg="commit limit must be a natural number. "
                 "{} contains {}".format(self.COMMITLIMITFILE, cl_content)
             )
 
@@ -1266,9 +1273,9 @@ class YARsync():
                     self._print("No synchronization directory found.")
 
         # parse synchronization data
-        sync = Sync(syncdata)
+        sync = _Sync(syncdata)
 
-        if not sync.by_repos and verbose:
+        if not sync and verbose:
             self._print("No synchronization information found.")
 
         return sync
@@ -1308,9 +1315,9 @@ class YARsync():
                 commits.append(commit)
 
         if "sync" in remote_files:
-            sync = Sync(remote_files["sync"])
+            sync = _Sync(remote_files["sync"])
         else:
-            sync = Sync([])
+            sync = _Sync([])
 
         remote_files["commits"] = commits
         remote_files["sync"] = sync
