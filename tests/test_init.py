@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Mock OS functions and check that they are called properly
 
 import os
@@ -29,11 +28,13 @@ def test_init_mixed(mocker):
     else:
         mocker.patch("builtins.open", m)
     mocker.patch("os.path.exists", _os_path_exists)
+    # otherwise listdir will complain that .ys doesn't exist
+    mocker.patch("os.listdir", lambda _: [])
 
     args = "yarsync init myhost".split()
     ys = YARsync(args)
     conffile = ys.CONFIGFILE
-    repofile = ys.REPOFILE
+    repofile = ys.REPOFILE.format("myhost")
     # call _init
     res = ys()
     assert res == 0
@@ -43,9 +44,10 @@ def test_init_mixed(mocker):
         call(conffile, "w"), call().__enter__(),
         call().write(CONFIG_EXAMPLE), call().write(''),
         call().__exit__(None, None, None),
-        call(repofile, "w"), call().__enter__(),
-        call().write("myhost"),
-        call().write(''),  # this write is because of print(end='').
+        call(repofile, "x"), call().__enter__(),
+        # call(repofile, "w"), call().__enter__(),
+        # call().write("myhost"),
+        # call().write(''),  # this write is because of print(end='').
         call().__exit__(None, None, None)
     ]
     old_calls = m.mock_calls[:]
@@ -63,11 +65,12 @@ def test_init_non_existent(mocker):
         mocker.patch("builtins.open", m)
     mocker.patch("os.path.exists", _os_path_exists)
     mkdir = mocker.patch("os.mkdir")
+    mocker.patch("os.listdir", lambda _: [])
 
     args = "yarsync init myhost".split()
     ys = YARsync(args)
     conffile = ys.CONFIGFILE
-    repofile = ys.REPOFILE
+    repofile = ys.REPOFILE.format("myhost")
 
     res = ys()
     assert res == 0
@@ -79,9 +82,7 @@ def test_init_non_existent(mocker):
         call(conffile, "w"), call().__enter__(),
         call().write(CONFIG_EXAMPLE), call().write(''),
         call().__exit__(None, None, None),
-        call(repofile, "w"), call().__enter__(),
-        call().write("myhost"),
-        call().write(''),  # this write is because of print(end='').
+        call(repofile, "x"), call().__enter__(),
         call().__exit__(None, None, None)
     ]
 
@@ -102,6 +103,7 @@ def test_init_existent(mocker):
     else:
         mocker.patch("builtins.open", m)
     mocker.patch("os.path.exists", _os_path_exists)
+    mocker.patch("os.listdir", lambda _: ["repo_myhost.txt"])
     mkdir = mocker.patch("os.mkdir")
 
     args = "yarsync init myhost".split()

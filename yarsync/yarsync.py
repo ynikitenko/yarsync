@@ -679,8 +679,8 @@ class YARsync():
         self.LOGDIRNAME = "logs"
         self.LOGDIR = os.path.join(self.config_dir, self.LOGDIRNAME)
         self.MERGEFILE = os.path.join(self.config_dir, "MERGE.txt")
-        # contains repository name
-        self.REPOFILE = os.path.join(self.config_dir, "repository.txt")
+        # template for the repository name
+        self.REPOFILE = os.path.join(self.config_dir, "repo_{}.txt")
         self.RSYNCFILTERNAME = "rsync-filter"
         self.RSYNCFILTER = os.path.join(self.config_dir, self.RSYNCFILTERNAME)
         # yarsync repositories are owned by one user.
@@ -949,7 +949,7 @@ class YARsync():
         older commits and logs will be removed.
         """
 
-        reponame = self._get_repo_name()
+        reponame = self._get_repo_name_local()
 
         username = getpass.getuser()
         time_str = time.strftime(self.DATEFMT, time.localtime())
@@ -1387,14 +1387,33 @@ class YARsync():
 
         return files
 
-    def _get_repo_name(self):
-        try:
-            with open(self.REPOFILE) as repofile:
-                reponame = repofile.read()
-        except OSError:
+    def _get_repo_name_if_exists(self, filelist=None):
+        """*filelist* is a list of configuration files in
+        YSDIR.
+
+        For a local repository it is automatically obtained here.
+        """
+        if filelist is None:
+            filelist = os.listdir(self.config_dir)
+        reponame = None
+
+        for fil in filelist:
+            if fil.startswith("repo_") and fil.endswith(".txt"):
+                if reponame is not None:
+                    raise YSConfigurationError(
+                        "several repository names found, {} and {}"
+                        .format(reponame, fil)
+                    )
+                reponame = fil[5:-4]
+        return reponame
+
+    def _get_repo_name_local(self):
+        reponame = self._get_repo_name_if_exists()
+        if reponame is None:
             # platform.node() just calls socket.gethostname()
             # with an error check
             reponame = socket.gethostname()
+
         return reponame
 
     def _init(self, reponame, merge=False):
@@ -1413,7 +1432,7 @@ class YARsync():
         without re-sending present remote files.
         """
         """
-How to merge:
+    How to merge:
     1) Prepare the merge.
        a) synchronize all needed repositories (bring them to the same state).
           This is not needed (see comment about commits), but will make things easier.
@@ -1499,8 +1518,9 @@ How to merge:
                         level=2)
 
         # create repofile
-        repofile = self.REPOFILE
-        if not os.path.exists(repofile):
+        repofile = self._get_repo_name_if_exists()
+        print("repofile=", repofile)
+        if not repofile:
             if not reponame:
                 self._print(
                     "# (to use a repository name different from `hostname`"
@@ -1509,9 +1529,12 @@ How to merge:
                     " or write it to {})".format(repofile)
                 )
             else:
+                # todo: if the path contains {}, it can lead to an error
+                repofile = self.REPOFILE.format(reponame)
                 self._print("# create configuration file {}".format(repofile))
-                with open(repofile, "w") as fil:
-                    print(reponame, end="", file=fil)
+                with open(repofile, "x"):
+                    pass
+                    # print(reponame, end="", file=fil)
                 new_config = True
         else:
             self._print("{} already exists, skip".format(repofile), level=2)
@@ -1972,7 +1995,7 @@ How to merge:
             # Obsolete local sync will be removed.
             remote_sync.update(local_sync.by_repos.items())
             last_commit = self._get_last_commit()
-            local_repo = self._get_repo_name()
+            local_repo = self._get_repo_name_local()
             # todo: get remote name from remote .ys/repo_<name>
             # forbid several files with such name
             remote_sync.update([
@@ -2099,7 +2122,7 @@ How to merge:
             # we have some commits,
             # because otherwise that would mean uncommitted changes.
             last_commit = self._get_last_commit()
-            local_repo = self._get_repo_name()
+            local_repo = self._get_repo_name_local()
             # see todo for push
             local_sync.update([
                 (local_repo, last_commit),
