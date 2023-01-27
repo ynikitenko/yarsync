@@ -275,7 +275,6 @@ class _Sync():
         # dictionary is True <=> non-empty
         return bool(self.by_repos)
 
-    @property
     def by_commits(self):
         bc = {}
         for repo, commit in self.by_repos.items():
@@ -1793,7 +1792,7 @@ class YARsync():
             if commit == head_commit:
                 commit_str += " (HEAD)"
             if commit in sync.by_repos.values():
-                remote_str = ", ".join(sync[commit])
+                remote_str = ", ".join(sync.by_commits()[commit])
                 commit_str += " <-> {}".format(remote_str)
         if log is None:
             log_str = "Log is missing"

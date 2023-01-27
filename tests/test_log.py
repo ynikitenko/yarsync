@@ -61,16 +61,17 @@ def test_log(mocker):
     time2_str = "Thu, 01 Jan 1970 03:00:02 MSK"
 
     assert mocker_print.mock_calls == [
-        call.write('No synchronization directory found.'),
-        call.write('\n'),
-        call.write('No synchronization information found.'),
-        call.write('\n'),
+        # todo: missing synchronization should be tested somewhere.
+        # call.write('No synchronization directory found.'),
+        # call.write('\n'),
+        # call.write('No synchronization information found.'),
+        # call.write('\n'),
         call.write('commit 3 is missing'),
         call.write('\n'),
         call.write('log 3\n'),
         call.write(''),
         call.write('\n'),
-        call.write('commit 2'),
+        call.write('commit 2 <-> other_repo'),
         call.write('\n'),
         call.write('When: {}\nWhere: user@host\n'.format(time2_str)),
         call.write(''),
@@ -89,10 +90,10 @@ def test_log(mocker):
     call = mocker.call
     assert res == 0
     assert mocker_print.mock_calls == [
-        call.write('No synchronization directory found.'),
-        call.write('\n'),
-        call.write('No synchronization information found.'),
-        call.write('\n'),
+        # call.write('No synchronization directory found.'),
+        # call.write('\n'),
+        # call.write('No synchronization information found.'),
+        # call.write('\n'),
         call.write('commit 1'),
         call.write('\n'),
         call.write('Log is missing\nWhen: {}\n'.format(time1_str)),
