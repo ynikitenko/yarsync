@@ -275,6 +275,9 @@ class _Sync():
         # dictionary is True <=> non-empty
         return bool(self.by_repos)
 
+    # note that by_commit() is a function,
+    # while by_repos is a field. This may be confusing,
+    # but it reflects their computational difference.
     def by_commits(self):
         bc = {}
         for repo, commit in self.by_repos.items():
@@ -2444,7 +2447,7 @@ class YARsync():
             commits = list(self._get_local_commits())
             last_commit = self._get_last_commit(commits)
             if last_commit in sync.by_repos.values():
-                last_repos = ", ".join(sync[last_commit])
+                last_repos = ", ".join(sync.by_commits()[last_commit])
                 self._print("\nCommits are up to date with {}."\
                             .format(last_repos))
             else:
@@ -2457,10 +2460,10 @@ class YARsync():
                     last_synced_commit = max(synced_commits)
                     n_newer_commits = sum([1 for comm in commits
                                            if comm > last_synced_commit])
-                    last_repos = ", ".join(sync[last_synced_commit])
+                    last_repos = ", ".join(sync.by_commits()[last_synced_commit])
                     # here we print a hash
                     # to distinguish this line from others
-                    self._print("# local repository is {} commits ahead of {}"\
+                    self._print("Local repository is {} commits ahead of {}"\
                                 .format(n_newer_commits, last_repos))
 
         # called from an internal method

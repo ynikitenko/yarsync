@@ -5,6 +5,7 @@ import sys
 import time
 
 from yarsync import YARsync
+from yarsync.yarsync import _Sync
 from .settings import (
     TEST_DIR, TEST_DIR_EMPTY, YSDIR, TEST_DIR_YS_BAD_PERMISSIONS,
     TEST_DIR_CONFIG_DIR, TEST_DIR_WORK_DIR, TEST_DIR_FILTER
@@ -123,3 +124,35 @@ def test_status_existing_commits(capfd, command, test_dir):
     #     call.write('No synchronization information found.'),
     #     call.write('\n'),
     # ]
+
+
+@pytest.mark.parametrize(
+    "local_sync",
+    [
+        (["1_other_repo"]),
+        (["2_other_repo", "1_other_repo"]),
+    ]
+)
+def test_status_existing_sync(mocker, capfd, local_sync):
+    n_commits_ahead = 1
+    other_repo = "other_repo"
+
+    os.chdir(TEST_DIR)
+    ys = YARsync(["yarsync", "status"])
+    sync = _Sync(local_sync)
+
+    mock = mocker.Mock()
+    mock.return_value = sync
+    ys._get_local_sync = mock
+
+    res = ys()
+
+    captured = capfd.readouterr()
+    assert not captured.err
+    if len(local_sync) == 1:
+        sync_str = "Local repository is {} commits ahead of {}\n"\
+                   .format(n_commits_ahead, other_repo)
+        assert sync_str in captured.out
+    else:
+        sync_str = "Commits are up to date with {}.\n".format(other_repo)
+        assert sync_str in captured.out
