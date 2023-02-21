@@ -248,6 +248,7 @@ class _Sync():
         br = {}
         for s in sync_list:
             commit, repo = s.split("_", maxsplit=1)
+            repo = repo[:-4]  # remove .txt extension
             try:
                 commit = _check_positive(commit)
             except argparse.ArgumentTypeError:
@@ -263,6 +264,8 @@ class _Sync():
                 br[repo] = commit
 
         # to quickly get all synchronized commits, use br.values()
+
+        self.SYNCSTR = "{}_{}.txt"  # .format(commit, repo)
 
         self.by_repos = br
         # outdated commits from other to be removed
@@ -297,8 +300,9 @@ class _Sync():
         br = self.by_repos
         new = self.new
         removed = self.removed
+        syncstr = self.SYNCSTR
         for repo, commit in other:
-            sync_str = "{}_{}".format(commit, repo)
+            sync_str = syncstr.format(commit, repo)
             if repo in br:
                 if commit > br[repo]:
                     br[repo] = commit
@@ -692,6 +696,7 @@ class YARsync():
         self.RSYNCOPTIONS = ["-avH", "--no-owner", "--no-group"]
         # stores synchronization information
         self.SYNCDIR = os.path.join(self.config_dir, "sync")
+        # SYNCSTR is defined in _Sync
         # self.SYNCFILE = os.path.join(self.config_dir, "sync.txt")
 
         ## Check for CONFIGFILE
@@ -1796,7 +1801,7 @@ class YARsync():
                 commit_str += " (HEAD)"
             if commit in sync.by_repos.values():
                 remote_str = ", ".join(sync.by_commits()[commit])
-                commit_str += " <-> {}".format(remote_str)
+                commit_str += " <-> {}".format(remote_str)  # remove .txt
         if log is None:
             log_str = "Log is missing"
             # time.time is timezone independent.

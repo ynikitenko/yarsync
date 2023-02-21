@@ -129,8 +129,8 @@ def test_status_existing_commits(capfd, command, test_dir):
 @pytest.mark.parametrize(
     "local_sync",
     [
-        (["1_other_repo"]),
-        (["2_other_repo", "1_other_repo"]),
+        (["1_other_repo.txt"]),
+        (["2_other_repo.txt", "1_other_repo.txt"]),
     ]
 )
 def test_status_existing_sync(mocker, capfd, local_sync):

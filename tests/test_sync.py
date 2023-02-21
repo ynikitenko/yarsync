@@ -15,7 +15,7 @@ def test_sync():
         "2_c",
         "2_a"
     ]
-    s0 = Sync(sync_list)
+    s0 = Sync([s + ".txt" for s in sync_list])
 
     assert s0.by_repos == {
         "a": 2,
@@ -30,7 +30,7 @@ def test_sync():
     # assert s0.repos == frozenset(("a", "b", "c"))
 
     sync_list_2 = ["1_a", "2_b2", "3_dd"]
-    s1 = Sync(sync_list_2)
+    s1 = Sync([s + ".txt" for s in sync_list_2])
     s0.update(s1.by_repos.items())
     repos1 = {
         "a": 2,
@@ -45,9 +45,9 @@ def test_sync():
     # }
     # assert s0.repos == frozenset(("a", "b", "c"))
     # tuple, otherwise set contains characters from the string
-    removed1 = set(("1_a",))
+    removed1 = set(("1_a.txt",))
     assert s0.removed == removed1
-    new1 = set(("2_b2", "3_dd"))
+    new1 = set(("2_b2.txt", "3_dd.txt"))
     assert s0.new == new1
     # update is idempotent (doesn't change new and removed, as well as sync)
     s0.update(s1.by_repos.items())
@@ -57,7 +57,7 @@ def test_sync():
 
     # incorrect commit number raises
     with pytest.raises(YSConfigurationError):
-        Sync(["a_a"])
+        Sync(["a_a.txt"])
 
 
 def test_sync_bool():
@@ -65,5 +65,5 @@ def test_sync_bool():
     assert not Sync([])
 
     # True if there is data
-    sync_list = ["1_a"]
+    sync_list = ["1_a.txt"]
     assert Sync(sync_list)
