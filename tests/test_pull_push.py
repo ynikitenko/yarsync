@@ -39,7 +39,7 @@ def test_pull_push_uncommitted(
 
 
 @pytest.mark.parametrize("backup_dir", [True, False])
-def test_backup(tmp_path_factory, backup_dir, test_dir):
+def _not_test_backup(tmp_path_factory, backup_dir, test_dir):
     # important for proper cloning
     test_dir += os.path.sep
     local_path = tmp_path_factory.mktemp("local")

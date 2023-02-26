@@ -291,26 +291,34 @@ class _Sync():
 
         return bc
 
+    def remove_repo(self, repo):
+        # repo is removed only from a clean state
+        assert not self.new and not self.removed
+
+        commit = self.by_repos[repo]
+        sync_str = self.SYNCSTR.format(commit, repo)
+        self.removed.add(sync_str)
+
     def update(self, other):
         """Update synchronization information with that from *other*.
 
         *other* is an iterable of (commit, repo) pairs,
         for example, *_Sync.by_repos.items()*.
         """
-        br = self.by_repos
+        local = self.by_repos
         new = self.new
         removed = self.removed
-        syncstr = self.SYNCSTR
+        _syncstr = self.SYNCSTR
         for repo, commit in other:
-            sync_str = syncstr.format(commit, repo)
-            if repo in br:
-                if commit > br[repo]:
-                    br[repo] = commit
+            sync_str = _syncstr.format(commit, repo)
+            if repo in local:
+                if commit > local[repo]:
+                    local[repo] = commit
                     new.add(sync_str)
-                elif commit < br[repo]:
+                elif commit < local[repo]:
                     removed.add(sync_str)
             else:
-                br[repo] = commit
+                local[repo] = commit
                 new.add(sync_str)
 
 
@@ -401,12 +409,14 @@ class YARsync():
             help="clone a repository"
         )
         parser_clone.add_argument(
-            "source", metavar="<source>",
-            help="path to the source repository"
+            "name", metavar="<name>",
+            help="name of the remote repository",
         )
+        # we don't call it path here
+        # to distinguish it from is its parent
         parser_clone.add_argument(
-            "destination", metavar="<destination>",
-            help="path to the cloned repository"
+            "path", metavar="<path|parent path>",
+            help="path to the origin (clone from) or to the parent directory of the clone (to)"
         )
 
         # commit #
@@ -628,20 +638,25 @@ class YARsync():
             if args.command_name == "init":
                 root_dir = "."
                 config_dir = _ysdir
-            elif args.command_name != "clone":
+            else:
                 # search the current directory and its parents
                 try:
                     root_dir = _get_root_directory(_ysdir)
                 except OSError as err:
                     # config dir not found.
-                    _print_error(
-                        "fatal: no {} configuration directory {} found".
-                        format(self.NAME, _ysdir) +
-                        "\n  Check that you are inside an existing repository"
-                        "\n  or initialize a new repository with '{} init'.".
-                        format(self.NAME)
-                    )
-                    raise err
+                    if args.command_name == "clone":
+                        root_dir = ""
+                    else:
+                        _print_error(
+                            "fatal: no {} configuration directory {} found".
+                            format(self.NAME, _ysdir) +
+                            "\n  Check that you are inside"
+                            " an existing repository"
+                            "\n  or initialize a new repository"
+                            " with '{} init'.".
+                            format(self.NAME)
+                        )
+                        raise err
                 config_dir = os.path.join(root_dir, _ysdir)
         elif config_dir:
             if not root_dir:
@@ -755,10 +770,20 @@ class YARsync():
                 limit=args.limit, message=args.message
             )
         elif args.command_name == "clone":
-            self._func = functools.partial(
-                self._clone,
-                source=args.source, destination=args.destination,
-            )
+            if root_dir:
+                # cloning to
+                thisreponame = os.path.basename(self.root_dir)
+                destination = os.path.join(args.path, thisreponame)
+                self._func = functools.partial(
+                    self._clone_to,
+                    remote=args.name, path=destination
+                )
+            else:
+                # cloning from
+                self._func = functools.partial(
+                    self._clone_from,
+                    remote=args.name, path=args.path
+                )
         elif args.command_name == "init":
             # https://stackoverflow.com/a/41070441/952234
             self._func = functools.partial(self._init, args.reponame, args.merge)
@@ -782,6 +807,7 @@ class YARsync():
             self._func = functools.partial(
                 # common options
                 self._pull_push, args.command_name, remote,
+                dry_run=args.dry_run,
                 force=args.force, overwrite=args.overwrite,
                 # pull options
                 new=new, backup=backup, backup_dir=backup_dir
@@ -801,93 +827,98 @@ class YARsync():
 
         self._args = args
 
-    def _clone(self, source, destination):
-        """Clone a yarsync *source* to a *destination*.
+    def _clone_from(self, remote, path):
+        """Clone the repository from *path*.
 
+        The new repository will have the origin
+        as a remote with the name *remote*.
+        """
+        if path.endswith('/'):
+            path = path[:-1]
+        repo_dir_name = os.path.basename(path)
+
+        if not os.path.exists(repo_dir_name):
+            self._print_command("mkdir {}".format(repo_dir_name))
+            os.mkdir(repo_dir_name)
+        else:
+            _print_error(
+                "directory {} exists, aborting"
+                .format(repo_dir_name)
+            )
+            return COMMAND_ERROR
+
+        os.chdir(repo_dir_name)
+        # initialize a new object
+        # to set the working and configuration directories
+        ys = YARsync(["yarsync", "-qq", "init"])
+        ys()
+        ys._remote_add(remote, path)
+
+        # todo: fix configuration update during remote_add.
+        ys_pull = YARsync(["yarsync", "-qq", "pull", remote])
+        # possible exceptions will raise from _pull_push,
+        # we don't do cleaning up in the local repository.
+        returncode = ys_pull._pull_push("pull", remote)
+        if returncode:
+            _print_error("an error occurred while pulling data from {}."
+                         .format(remote))
+        else:
+            self._print("\ncloned from {}.".format(remote))
+
+        return returncode
+
+    def _clone_to(self, remote, path):
+        """Clone this repository to *path*.
+
+        *path* is the full path to the new repository.
+        Note that *destination* provided on the command line
+        is the parent directory of *path*, which is then joined
+        with the name of the local repository.
+
+        *remote* is the remote name added to the local configuration
+        and into synchronization information.
+
+        ?
         Only data (working directory, commits and logs)
         and *rsync-filter* will be cloned.
-
-        *source* or *destination* (not both) can be remote paths.
-        If a remote *source* has an *rsync-filter*, the command fails and
-        an error is raised.
-
-        If *source* ends with a slash, its contents are copied
-        inside *destination*, otherwise *source* becomes its subfolder
-        (standard *rsync* semantics).
         """
-        ## check for rsync-filter in source
+        # 1. Add remote <remote>
+        returncode = self._remote_add(remote, path)
+        if returncode:
+            # all errors will be printed in _remote_add
+            return returncode
+        # add remote to the parsed configdict for push.
+        # We could have made it an argument for _pull_push,
+        # but it may use config for finer transfer options.
+        self._configdict[remote] = {}
+        self._configdict[remote]["destpath"] = path
+
+        def remote_rm():
+            self._remote_rm(remote)
+            try:
+                sync = self._sync
+            except AttributeError:
+                # sync was not updated by push
+                pass
+            else:
+                sync.remove_repo(remote)
+                # todo: maybe should be a method of _Sync
+                self._write_sync(sync)
+            _print_error("\ncould not push data to {}".format(path))
+
+        # 2. push --force to <remote>
         try:
-            # all os.path.join are incorrect if remote is on Windows.
-            # The path must end with a '/'
-            # for rsync to list directory contents (not its name).
-            source_ys_dir = os.path.join(source, self.YSDIR, "")
-            source_configs = [os.path.split(path)[1]
-                              for path in self._get_remote_files(source_ys_dir)]
-        except OSError as err:
-            raise OSError(
-                "could not read configuration in the repository {} ".
-                format(source) + str(err)
-            )
-
-        source_is_remote = _is_remote(source)
-        has_rsync_filter = self.RSYNCFILTERNAME in source_configs
-
-        if has_rsync_filter and source_is_remote:
-            _print_error(
-                "remote source configuration contains rsync-filter. "
-                "Aborting.\n  "
-                "Only local repositories with filters can be cloned.\n"
-                "  As a workaround, initialize a local repository,"
-                "  copy remote filter locally, add source as a remote\n"
-                "  and pull remote data."
-            )
-            raise YSCommandError()
-        elif has_rsync_filter:
-            self._print(
-                "source has an rsync-filter. For a complete synchronization, "
-                "a manual copy of filtered files/directories might be needed."
-            )
-
-        # if not source.endswith('/'):
-        #     # add trailing slash
-        #     source += '/'
-        #     # remove trailing slash (it would be meaningless for a repo)
-        #     # source = source[:-1]
-
-        command = ["rsync"]
-        command.extend(self.RSYNCOPTIONS)
-        command.append("--no-inc-recursive")
-        # todo: include rsync-filter into the transferred set!
-        filter_ = self._get_filter(path=source)
-        command.extend(filter_)
-
-        command.append(source)
-        command.append(destination)
-
-        if self.print_level >= 3:
-            stdout = None
-            self._print_command(command, level=3)
-        else:
-            # for push and pull we pipe stdout,
-            # but for clone it would be redundant
-            # (one can list all local files with find)
-            stdout = subprocess.DEVNULL
-
-        # todo: create sync locally. Write it.
-
-        # run rsync
-        completed_process = subprocess.Popen(command, stdout=stdout)
-        completed_process.wait()
-        returncode = completed_process.returncode
+            returncode = self._pull_push("push", remote, force=True)
+        except BaseException as e:
+            # for idempotence in case of errors
+            remote_rm()
+            raise e
 
         if returncode:
-            _print_error(
-                "an error occurred, rsync returned {}. Exit".
-                format(returncode)
-            )
+            remote_rm()
             return returncode
 
-        self._print("\n{} cloned.".format(source))
+        self._print("\ncloned to {}.".format(remote))
         return returncode
 
     def _checkout(self, commit=None):
@@ -981,6 +1012,7 @@ class YARsync():
         message += log_str
 
         if not os.path.exists(self.COMMITDIR):
+            self._print_command("mkdir {}".format(self.COMMITDIR))
             os.mkdir(self.COMMITDIR)
 
         commit_name = str(int(time.time()))
@@ -1294,7 +1326,7 @@ class YARsync():
                 config_dir, with_commits=True, print_level=print_level
             )
         except OSError:
-            return []
+            return {"commits": [], "sync": _Sync([])}
             # allow a missing .ys directory for a new repository
             # (can simply push local commits there).
             # # detailed error messages are already printed by rsync
@@ -1405,6 +1437,7 @@ class YARsync():
         reponame = None
 
         for fil in filelist:
+            # format of REPOFILE
             if fil.startswith("repo_") and fil.endswith(".txt"):
                 if reponame is not None:
                     raise YSConfigurationError(
@@ -1423,7 +1456,7 @@ class YARsync():
 
         return reponame
 
-    def _init(self, reponame, merge=False):
+    def _init(self, reponame="", merge=False):
         """Initialize default configuration.
 
         Create configuration folder, configuration and repository files.
@@ -1526,7 +1559,6 @@ class YARsync():
 
         # create repofile
         repofile = self._get_repo_name_if_exists()
-        print("repofile=", repofile)
         if not repofile:
             if not reponame:
                 self._print(
@@ -1541,7 +1573,6 @@ class YARsync():
                 self._print("# create configuration file {}".format(repofile))
                 with open(repofile, "x"):
                     pass
-                    # print(reponame, end="", file=fil)
                 new_config = True
         else:
             self._print("{} already exists, skip".format(repofile), level=2)
@@ -1743,17 +1774,20 @@ class YARsync():
         head_commit = self._get_head_commit()
 
         def print_logs(commit_log_list):
+            local_repo = self._get_repo_name_local()
             for ind, (commit, log) in enumerate(commit_log_list):
                 if ind:
                     print()
-                self._print_log(commit, log, sync, head_commit)
+                self._print_log(
+                    commit, log,
+                    local_repo=local_repo, sync=sync, head_commit=head_commit
+                )
 
         print_logs(commit_log_list)
 
         if not commit_log_list:
             self._print("No commits found")
 
-        # in fact, sys.exit(None) still returns 0 to the shell
         return 0
 
     def _print(self, *args, level=None, **kwargs):
@@ -1791,7 +1825,7 @@ class YARsync():
             # list
             self._print(" ".join(command_str(command)), level=level)
 
-    def _print_log(self, commit, log, sync=None, head_commit=None):
+    def _print_log(self, commit, log, local_repo, sync=None, head_commit=None):
         if commit is None:
             commit_str = "commit {} is missing".format(log)
             commit = log
@@ -1800,8 +1834,11 @@ class YARsync():
             if commit == head_commit:
                 commit_str += " (HEAD)"
             if commit in sync.by_repos.values():
-                remote_str = ", ".join(sync.by_commits()[commit])
-                commit_str += " <-> {}".format(remote_str)  # remove .txt
+                other_repos = (repo for repo in sync.by_commits()[commit]
+                               if repo != local_repo)
+                remote_str = ", ".join(other_repos)
+                commit_str += " <-> {}".format(remote_str)
+
         if log is None:
             log_str = "Log is missing"
             # time.time is timezone independent.
@@ -1815,12 +1852,14 @@ class YARsync():
             # read returns a redundant newline
             log_str = log_file.read()
             # print("log_str: '{}'".format(log_str))
+
         # hard to imagine a "quiet log", but still.
         self._print(commit_str, log_str, sep='\n', end='')
         # print(commit_str, log_str, sep='\n', end='')
 
     def _pull_push(
             self, command_name, remote,
+            dry_run=False,
             force=False, new=False, overwrite=False,
             backup=False, backup_dir=""
         ):
@@ -1884,7 +1923,6 @@ class YARsync():
         if self.print_level >= 3:
             command.append("-P")
 
-        dry_run = self._args.dry_run
         if dry_run:
             command.append("-n")
 
@@ -1979,42 +2017,28 @@ class YARsync():
 
         self._print_command(command, level=3)
 
-        def write_sync(self, sync, verbose=True):
-            if verbose:
-                self._print("update synchronization:")
-            for sync_str in sync.removed:
-                if verbose:
-                    self._print("  remove", sync_str)
-                os.remove(os.path.join(self.SYNCDIR, sync_str))
-            for sync_str in sync.new:
-                if verbose:
-                    self._print("  create", sync_str)
-                if not os.path.exists(self.SYNCDIR):
-                    os.mkdir(self.SYNCDIR)
-                with open(os.path.join(self.SYNCDIR, sync_str), "x"):
-                    # just create this file
-                    pass
-
         # push synchronization information to the remote
         if command_name == "push" and not new and not dry_run:
             # forbid --new sync update,
             # because it messes all sync together.
             # Obsolete local sync will be removed.
-            remote_sync.update(local_sync.by_repos.items())
+            local_sync.update(remote_sync.by_repos.items())
             last_commit = self._get_last_commit()
             local_repo = self._get_repo_name_local()
             # todo: get remote name from remote .ys/repo_<name>
             # forbid several files with such name
-            remote_sync.update([
+            local_sync.update([
                 (local_repo, last_commit),
                 (remote, last_commit)
             ])
             try:
-                write_sync(self, remote_sync)
+                self._write_sync(local_sync)
             except OSError as err:
-                _print_error("could not log to {}. Abort."
+                _print_error("could not log synchronization to {}. Abort."
                              .format(self.SYNCDIR))
                 raise err
+            # object attribute to reverse sync easier 
+            self._sync = local_sync
 
         # ----------------------------------------------------------
         #         Run
@@ -2060,8 +2084,9 @@ class YARsync():
             print()  # "data transferred for commits:")
             for comm in sorted(transferred_commits):
                 print("commit", comm)
-        else:
-            completed_process.wait()
+
+        # need to wait even if stdout has been exhausted
+        completed_process.wait()
 
         returncode = completed_process.returncode
         if returncode:
@@ -2077,8 +2102,9 @@ class YARsync():
                 self._print("local commits missing")
             if not remote_commits:
                 self._print("remote commits missing")
-            self._print("run {} without --new to fully synchronize "
-                        "repositories".format(command_name))
+            if new:
+                self._print("run {} without --new to fully synchronize "
+                            "repositories".format(command_name))
         elif new:
             last_remote_comm = max(remote_commits)
             if last_remote_comm in local_commits:
@@ -2136,9 +2162,9 @@ class YARsync():
                 (remote, last_commit)
             ])
             try:
-                write_sync(self, local_sync)
+                self._write_sync(local_sync)
             except OSError as err:
-                _print_error("data transferred, but could not log to "\
+                _print_error("data transferred, but could not log synchronization to "\
                              + self.SYNCDIR)
 
         if not new and not dry_run:
@@ -2162,6 +2188,7 @@ class YARsync():
         # is undocumented in Python2, but present!
         config.read_string(subst_lines)
 
+        # todo !!: only one of config or configdict must be used!
         # configdict is config with some evaluations,
         # like full paths.
         configdict = {}
@@ -2339,9 +2366,11 @@ class YARsync():
 
         ## no commits is fine for an initial commit
         if not commit_subdirs:
+            configpath = os.path.normpath(self.config_dir)
             if check_changed:
                 for subdir in os.scandir(self.root_dir):
-                    if subdir.path != self.config_dir or subdir.is_file():
+                    subdir_path = os.path.normpath(subdir.path)
+                    if subdir_path != configpath or subdir.is_file():
                         return (0, True)
                 # if there is only '.ys' in the working directory,
                 # then the repository is unchanged.
@@ -2484,6 +2513,28 @@ class YARsync():
             os.remove(self.HEADFILE)
         except FileNotFoundError:
             pass
+
+    def _write_sync(self, sync, verbose=True):
+        if verbose:
+            self._print("update synchronization:")
+        for sync_str in sync.removed:
+            if verbose:
+                self._print("  remove", sync_str)
+            os.remove(os.path.join(self.SYNCDIR, sync_str))
+        if sync.new and not os.path.exists(self.SYNCDIR):
+            self._print_command("mkdir {}".format(self.SYNCDIR))
+            os.mkdir(self.SYNCDIR)
+        for sync_str in sync.new:
+            if verbose:
+                self._print("  create", sync_str)
+            with open(os.path.join(self.SYNCDIR, sync_str), "x"):
+                # just create this file
+                pass
+
+        # we never write sync twice. New might be useful to store
+        # whether most recent local sync was updated or not.
+        # sync.new = set()
+        # sync.removed = set()
 
     def __call__(self):
         """Call the command set during the initialisation."""

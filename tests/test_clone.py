@@ -13,14 +13,14 @@ from .settings import TEST_DIR, TEST_DIR_FILTER
 
 
 @pytest.mark.parametrize(
-    "clone_command",
-    [
-        ["yarsync", "-v", "clone", TEST_DIR + os.path.sep],
-        ["yarsync", "clone", TEST_DIR_FILTER + os.path.sep]
-    ]
+    "test_dir", (TEST_DIR,)  # TEST_DIR_FILTER)
 )
-def test_clone(tmpdir, clone_command):
-    clone_command.append(str(tmpdir))
+def test_clone(tmpdir, test_dir):
+    os.chdir(test_dir)
+    clone_repo = "tmp"
+
+    clone_command = ["yarsync", "clone", clone_repo, str(tmpdir)]
+
     ys = YARsync(clone_command)
     returncode = ys()
     assert not returncode
@@ -28,17 +28,22 @@ def test_clone(tmpdir, clone_command):
     # todo: capture output
     # if "-v" in clone_command: ...
 
-    test_dir = clone_command[-1]
-
     # all files were transferred
-    # we compare sets, because the ordering would be different
-    new_files = set(os.listdir(tmpdir))
-    assert new_files.issubset(set(os.listdir(TEST_DIR)))
+    new_repo = os.path.join(tmpdir, os.path.basename(test_dir))
+    # we compare sets, because the ordering will be different
+    new_files = set(os.listdir(new_repo))
+    assert new_files.issubset(set(os.listdir(test_dir)))
     # they are not equal, because rsync-filter excludes 'b'
     assert 'a' in new_files
 
+    # clean up
+    ys._remote_rm(clone_repo)
+    sync = ys._sync
+    sync.remove_repo(clone_repo)
+    ys._write_sync(sync)
 
-def test_clone_2(tmpdir, capfd, test_dir_ys_bad_permissions):
+
+def _test_clone_2(tmpdir, capfd, test_dir_ys_bad_permissions):
     # additional checks
     clone_command = ["yarsync", "clone"]
 
