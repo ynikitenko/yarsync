@@ -30,8 +30,8 @@ def test_log_empty(mocker):
     call = mocker.call
     assert res == 0
     assert mocker_print.mock_calls == [
-        # call.write('No synchronization directory found.'),
-        # call.write('\n'),
+        call.write('No synchronization directory found.'),
+        call.write('\n'),
         call.write('No synchronization information found.'),
         call.write('\n'),
         call.write('No commits found'), call.write('\n')
