@@ -4,6 +4,7 @@ import pytest
 import subprocess
 
 from yarsync import YARsync
+from .helpers import clone_repo
 from .settings import (
     TEST_DIR, TEST_DIR_EMPTY, YSDIR, TEST_DIR_YS_BAD_PERMISSIONS
 )
@@ -39,21 +40,24 @@ def test_pull_push_uncommitted(
 
 
 @pytest.mark.parametrize("backup_dir", [True, False])
-def _not_test_backup(tmp_path_factory, backup_dir, test_dir):
-    # important for proper cloning
-    test_dir += os.path.sep
+def test_backup(tmp_path_factory, backup_dir, test_dir):
     local_path = tmp_path_factory.mktemp("local")
-    remote_path = tmp_path_factory.mktemp("remote")
-    local = local_path.__str__() + os.path.sep
-    remote = remote_path.__str__() + os.path.sep
+    source_path = tmp_path_factory.mktemp("repo")
+    local = local_path.__str__()
+    source = source_path.__str__()
 
-    ## clone test_dir -> remote -> local
-    # now local has remote as an "origin" remote
-    ys_clone = YARsync(["yarsync", "-qq", "clone", test_dir, remote])
-    ys_clone()
-    ys_clone._clone(remote, local)
-    print("created yarsync repositories {} and {}".format(remote, local))
+    ## clone test_dir -> source -> local
 
+    clone_repo(test_dir, source)
+    # strange, why we first enter source, then local...
+    # Better call them different names then.
+    os.chdir(source)
+    YARsync(["yarsync", "-qq", "clone", "origin", local])()
+    print("created yarsync repositories {} and {}".format(source, local))
+
+    # adjust the real path to the repo
+    source_name = os.path.basename(source)
+    local_path = local_path / source_name
     # corrupt some local files
     local_a = local_path / "a"
     local_a.write_text("b\n")
@@ -62,16 +66,16 @@ def _not_test_backup(tmp_path_factory, backup_dir, test_dir):
 
     os.chdir(local)
     YARsync(["yarsync", "init"])()
-    YARsync(["yarsync", "remote", "add", "origin", remote])()
+    YARsync(["yarsync", "remote", "add", "origin", source])()
     ys_push = YARsync(["yarsync", "push", "origin"])
     # if you have problems during push because of uncommitted changes,
     # this might be because of hard links broken by git.
     ys_push()
-    remote_a = remote_path / "a"
+    source_a = source_path / "a"
     # no evil was transferred!
     # it won't be transferred after rsync is improved,
     # https://github.com/WayneD/rsync/issues/357
-    # assert remote_a.read_text() == "a\n"
+    # assert source_a.read_text() == "a\n"
 
     ys_command = ["yarsync", "pull"]
     if backup_dir:
