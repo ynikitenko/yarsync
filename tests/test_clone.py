@@ -58,7 +58,6 @@ def test_clone_2(tmp_path_factory, capfd, test_dir_ys_bad_permissions):
 
     assert return_code == COMMAND_ERROR
     err = capfd.readouterr().err
-    assert 'remote contains no yarsync repository' in err
     assert 'no yarsync repository found at ' in err
 
     src2 = test_dir_ys_bad_permissions
