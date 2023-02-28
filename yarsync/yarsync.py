@@ -858,13 +858,20 @@ class YARsync():
         ys_pull = YARsync(["yarsync", "-qq", "pull", remote])
         # possible exceptions will raise from _pull_push,
         # we don't do cleaning up in the local repository.
+        # If the remote is not a repository, we shall know about it here
         returncode = ys_pull._pull_push("pull", remote)
-        if returncode:
+        if returncode == CONFIG_ERROR:
+            _print_error("no yarsync repository found at {}".format(path))
+            self._print("\nremoving remote {}".format(remote))
+            ys._remote_rm(remote)
+            return COMMAND_ERROR
+        elif returncode:
             _print_error("an error occurred while pulling data from {}."
                          .format(remote))
         else:
             self._print("\ncloned from {}.".format(remote))
 
+        print("returncode =", returncode)
         return returncode
 
     def _clone_to(self, remote, path):
@@ -906,9 +913,11 @@ class YARsync():
                 self._write_sync(sync)
             _print_error("\ncould not push data to {}".format(path))
 
-        # 2. push --force to <remote>
+        # 2. push to <remote>
         try:
-            returncode = self._pull_push("push", remote, force=True)
+            returncode = self._pull_push(
+                "push", remote, clone=True,  # force=True, 
+            )
         except BaseException as e:
             # for idempotence in case of errors
             remote_rm()
@@ -1325,14 +1334,14 @@ class YARsync():
             remote_files = self._get_remote_files(
                 config_dir, with_commits=True, print_level=print_level
             )
-        except OSError:
-            return {"commits": [], "sync": _Sync([])}
-            # allow a missing .ys directory for a new repository
-            # (can simply push local commits there).
+        except OSError as err:
+            # we don't push into a non-existing repository
+            raise err
             # # detailed error messages are already printed by rsync
             # raise OSError(
             #     "error while listing remote commits"
             # )
+            # return {"commits": [], "sync": _Sync([])}
 
         commits = []
         try:
@@ -1861,6 +1870,7 @@ class YARsync():
             self, command_name, remote,
             dry_run=False,
             force=False, new=False, overwrite=False,
+            clone=False,
             backup=False, backup_dir=""
         ):
         """Push/pull commits to/from destination or source.
@@ -1904,7 +1914,7 @@ class YARsync():
                     "rsync returned {}. Exit\n  ".format(returncode) +
                     "Run '{} status' for more details.".format(self.NAME)
                 )
-                return COMMAND_ERROR
+                return returncode  # COMMAND_ERROR
 
         try:
             full_destpath = self._get_dest_path(remote)
@@ -1964,11 +1974,20 @@ class YARsync():
         # if there are no remote commits (a new repository),
         # push will still work
         remote_config_dir = os.path.join(full_destpath, ".ys/")
-        remote_config = self._get_remote_config(
-            remote_config_dir,
-            # don't complain about errors
-            print_level=0
-        )
+        try:
+            remote_config = self._get_remote_config(
+                remote_config_dir,
+                # don't complain about errors
+                print_level=0
+            )
+        except OSError:
+            if clone and command_name == "push":
+                # we can clone into an empty folder.
+                # use an empty config for technical simplicity
+                remote_config = {"commits": [], "sync": _Sync([])}
+            else:
+                _print_error("remote contains no yarsync repository")
+                return CONFIG_ERROR
         remote_commits = remote_config["commits"]
         remote_sync = remote_config["sync"]
 
@@ -2085,7 +2104,7 @@ class YARsync():
             for comm in sorted(transferred_commits):
                 print("commit", comm)
 
-        # need to wait even if stdout has been exhausted
+        # need to wait even if stdout was exhausted
         completed_process.wait()
 
         returncode = completed_process.returncode

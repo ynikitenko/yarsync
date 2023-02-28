@@ -1,5 +1,6 @@
 import os
 
+
 # directory with commits and logs
 TEST_DIR = os.path.join(os.path.dirname(__file__), "test_dir")
 # same as TEST_DIR, but with an rsync-filter

@@ -7,6 +7,7 @@ import time
 from yarsync import YARsync
 
 from .settings import TEST_DIR, TEST_DIR_EMPTY, YSDIR
+from .helpers import clone_repo
 
 
 def test_commit(mocker):
@@ -111,8 +112,7 @@ def test_commit(mocker):
 @pytest.mark.parametrize("commit_time", [4, 0])
 def test_commit_with_limits(tmpdir, mocker, commit_time):
     """Test commit creation and logging."""
-    ys_clone = YARsync(["yarsync", "clone", TEST_DIR + os.path.sep, str(tmpdir)])
-    ys_clone()
+    clone_repo(TEST_DIR, str(tmpdir))
 
     os.chdir(tmpdir)
     ys = YARsync(["yarsync", "commit", "--limit", "1"])

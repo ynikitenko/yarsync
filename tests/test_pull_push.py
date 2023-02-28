@@ -52,6 +52,7 @@ def test_backup(tmp_path_factory, backup_dir, test_dir):
     # strange, why we first enter source, then local...
     # Better call them different names then.
     os.chdir(source)
+    # we make a real yarsync clone just to have origin.
     YARsync(["yarsync", "-qq", "clone", "origin", local])()
     print("created yarsync repositories {} and {}".format(source, local))
 
