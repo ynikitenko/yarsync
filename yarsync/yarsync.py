@@ -128,6 +128,30 @@ def _check_positive(value):
     return natural_num
 
 
+def _get_repo_name_if_exists(file_list=None, config_dir=""):
+    # separate function, because used by several classes
+    """*file_list* is a list of configuration files in
+    YSDIR.
+
+    For a local repository it is automatically obtained here.
+    """
+    if file_list is None:
+        file_list = os.listdir(config_dir)
+    reponame = None
+
+    for fil in file_list:
+        # format of REPOFILE
+        if fil.startswith("repo_") and fil.endswith(".txt"):
+            if reponame is not None:
+                raise YSConfigurationError(
+                    "several repository names found, {} and {}"
+                    .format(reponame, fil)
+                )
+            reponame = fil[5:-4]
+    # todo: assert reponame
+    return reponame
+
+
 def _get_root_directory(config_dir_name):
     """Search for a directory containing *config_dir_name*
     higher in the file system hierarchy.
@@ -235,12 +259,14 @@ def _mkhostpath(host, path):
     return path
 
 
+####################
 ## Helper classes ##
+####################
 
 class _Config():
     """Store configuration for different replicas."""
 
-    def __init__(self, file_list):
+    def __init__(self, file_list, allow_empty=False):
         commits = []
         try:
             cmts = file_list["commits"]
@@ -265,8 +291,12 @@ class _Config():
         else:
             sync = _Sync([])
 
-        self.repo_name = _get_repo_name_if_exists(self, file_list=file_list)
-        assert self.repo_name
+        self.repo_name = _get_repo_name_if_exists(file_list=file_list)
+        if not self.repo_name and not allow_empty:
+            raise YSConfigurationError(
+                msg="Could not find repository name. "
+                "Provide one with init."
+            )
         self.commits = commits
         self.sync = sync
         # ignore other files
@@ -811,11 +841,9 @@ class YARsync():
         elif args.command_name == "clone":
             if root_dir:
                 # cloning to
-                thisreponame = os.path.basename(self.root_dir)
-                destination = os.path.join(args.path, thisreponame)
                 self._func = functools.partial(
                     self._clone_to,
-                    remote=args.name, path=destination
+                    remote=args.name, parent_path=args.path
                 )
             else:
                 # cloning from
@@ -876,14 +904,26 @@ class YARsync():
             path = path[:-1]
         repo_dir_name = os.path.basename(path)
 
-        # get remote configuration
-        remote_config_path = os.path.join(path, self.YSDIR)
+        # get remote configuration. Note the trailing slash
+        remote_config_path = path + "/.ys/"
+        # remote_config_path = os.path.join(path, self.YSDIR)
         try:
             remote_config = self._get_remote_config(remote_config_path)
         except OSError:
             _print_error("no yarsync repository found at {}".format(path))
             return COMMAND_ERROR
+        except YSConfigurationError as err:
+            # todo: why is this not done in main?
+            _print_error(err.msg)
+            return CONFIG_ERROR
         remote_name = remote_config.repo_name
+        if remote_name == name:
+            # todo: it should be checked among all synced repos
+            _print_error(
+                "Name '{}' is already used by the remote. ".format(name) +
+                "Each replica name must be unique. Aborting"
+            )
+            return COMMAND_ERROR
         self._remote_config = remote_config
 
         # create a local directory
@@ -925,7 +965,7 @@ class YARsync():
 
         return returncode
 
-    def _clone_to(self, remote, path):
+    def _clone_to(self, remote, parent_path):
         """Clone this repository to *path*.
 
         *path* is the full path to the new repository.
@@ -940,16 +980,37 @@ class YARsync():
         Only data (working directory, commits and logs)
         and *rsync-filter* will be cloned.
         """
+        # 0. Check that remote directory doesn't exist
+        repo_dir_name = os.path.basename(self.root_dir)
+        path = os.path.join(parent_path, repo_dir_name)
+        # parent_path must exist on the remote
+        remote_files = self._get_remote_files(parent_path)
+        if repo_dir_name in remote_files:
+            _print_error(
+                "Repository folder already exists at {} . Aborting."
+                .format(parent_path)
+            )
+            return COMMAND_ERROR
+
         # 1. Add remote <remote>
+        # We don't check that remote is not in sync,
+        # because we might want to clone same repo anew (hypothetically)
         returncode = self._remote_add(remote, path)
         if returncode:
-            # all errors will be printed in _remote_add
+            # all errors were printed in _remote_add
             return returncode
         # add remote to the parsed configdict for push.
         # We could have made it an argument for _pull_push,
         # but it may use config for finer transfer options.
         self._configdict[remote] = {}
         self._configdict[remote]["destpath"] = path
+        # cache repo name before creating another file for that
+        self._get_repo_name_local()
+        # temporarily create a repo file to transfer it
+        remote_repo_file = self._write_repo_name(remote, verbose=False)
+        # todo: maybe optionally transfer config
+        # (without the new remote) as well
+        include_configs = [os.path.basename(remote_repo_file)]
 
         def remote_rm():
             self._remote_rm(remote)
@@ -967,12 +1028,15 @@ class YARsync():
         # 2. push to <remote>
         try:
             returncode = self._pull_push(
-                "push", remote, clone=True,  # force=True, 
+                "push", remote, clone=True,
+                include_configs=include_configs,  # force=True,
             )
         except BaseException as e:
             # for idempotence in case of errors
             remote_rm()
             raise e
+        finally:
+            os.remove(remote_repo_file)
 
         if returncode:
             remote_rm()
@@ -1293,11 +1357,13 @@ class YARsync():
 
         return destpath
 
-    def _get_filter(self, path="", include_commits=True):
-        """Get filters to be used during synchronization.
+    def _get_filter(self, path="", include_commits=True, include_configs=()):
+        """Make rsync filters to be used during synchronization.
 
         If *path* is non-empty, filters are relative to that path.
         """
+        # todo: path is probably not needed and not fully implemented
+        # rename to _make_filter.
         if path:
             rsync_filter = os.path.join(path, self.YSDIR, self.RSYNCFILTERNAME)
         else:
@@ -1309,19 +1375,28 @@ class YARsync():
             filter_ = ["--filter=merge {}".format(rsync_filter)]
         else:
             filter_ = []
+
+        include_filters = []
+
         if include_commits:
             includes = [
                 "/".join([self.YSDIR, self.COMMITDIRNAME]),
                 "/".join([self.YSDIR, self.LOGDIRNAME]),
                 # "/.ys/logs"
             ]
-            include_commands = ["--include={}".format(inc) for inc in includes]
+            include_filters = ["--include={}".format(inc) for inc in includes]
             # since we don't have spaces in the command,
             # single ticks are not necessary
-            filter_ += include_commands
 
-        # exclude can go before or after include,
-        # because the first matching rule is applied.
+        for config in include_configs:
+            # reponame for clone
+            inc_config = "/".join([self.YSDIR, config])
+            include_filters.append("--include={}".format(inc_config))
+
+        filter_.extend(include_filters)
+
+        # exclude could go before or after include,
+        # but the first matching rule is applied.
         # It's important to place /* after .ys,
         # because it means files exactly one level below .ys
         filter_ += ["--exclude=/.ys/*"]
@@ -1351,7 +1426,6 @@ class YARsync():
         """Return local commits as an iterable of integers."""
         # todo: cache results.
         try:
-            # listdir always returns a list (Python 2 and 3)
             commit_candidates = os.listdir(self.COMMITDIR)
         except OSError:
             # no commits exist
@@ -1467,35 +1541,19 @@ class YARsync():
 
         return files
 
-    def _get_repo_name_if_exists(self, file_list=None):
-        """*file_list* is a list of configuration files in
-        YSDIR.
-
-        For a local repository it is automatically obtained here.
-        """
-        if file_list is None:
-            file_list = os.listdir(self.config_dir)
-        reponame = None
-
-        for fil in file_list:
-            # format of REPOFILE
-            if fil.startswith("repo_") and fil.endswith(".txt"):
-                if reponame is not None:
-                    raise YSConfigurationError(
-                        "several repository names found, {} and {}"
-                        .format(reponame, fil)
-                    )
-                reponame = fil[5:-4]
-        # todo: assert reponame
-        return reponame
-
     def _get_repo_name_local(self):
-        reponame = self._get_repo_name_if_exists()
+        # cache this value, because in clone we create a temporary one
+        # and wouldn't be able to have two files simultaneously
+        if hasattr(self, "_reponame"):
+            return self._reponame
+
+        reponame = _get_repo_name_if_exists(config_dir=self.config_dir)
         if reponame is None:
             # platform.node() just calls socket.gethostname()
             # with an error check
             reponame = socket.gethostname()
 
+        self._reponame = reponame
         return reponame
 
     def _init(self, reponame="", merge=False):
@@ -1601,7 +1659,7 @@ class YARsync():
 
         # create repofile
         # todo: is it repo file or name?..
-        repofile = self._get_repo_name_if_exists()
+        repofile = _get_repo_name_if_exists(config_dir=self.config_dir)
         if not repofile:
             if not reponame:
                 self._print(
@@ -1611,11 +1669,7 @@ class YARsync():
                     " or write it to {})".format(repofile)
                 )
             else:
-                # todo: if the path contains {}, it can lead to an error
-                repofile = self.REPOFILE.format(reponame)
-                self._print("# create configuration file {}".format(repofile))
-                with open(repofile, "x"):
-                    pass
+                self._write_repo_name(reponame)
                 new_config = True
         else:
             self._print("{} already exists, skip".format(repofile), level=2)
@@ -1904,7 +1958,7 @@ class YARsync():
             self, command_name, remote,
             dry_run=False,
             force=False, new=False, overwrite=False,
-            clone=False,
+            clone=False, include_configs=(),
             backup=False, backup_dir=""
         ):
         """Push/pull commits to/from destination or source.
@@ -1991,7 +2045,10 @@ class YARsync():
         # we don't include commits (filter them in)
         # only if we do backups
         include_commits = not backup
-        filter_ = self._get_filter(include_commits=include_commits)
+        filter_ = self._get_filter(
+            include_commits=include_commits,
+            include_configs=include_configs
+        )
         command.extend(filter_)
 
         root_path = self.root_dir + "/"
@@ -2005,7 +2062,7 @@ class YARsync():
         local_commits = list(self._get_local_commits())
         local_sync = self._get_local_sync(verbose=True)
 
-        # get remote configuration
+        # get remote configuration. Note the trailing slash.
         remote_config_dir = os.path.join(full_destpath, ".ys/")
         try:
             remote_config = self._get_remote_config(
@@ -2017,12 +2074,12 @@ class YARsync():
             if clone and command_name == "push":
                 # we can clone into an empty folder.
                 # use an empty config for technical simplicity
-                remote_config = {"commits": [], "sync": _Sync([])}
+                remote_config = _Config({}, allow_empty=True)
             else:
                 _print_error("remote contains no yarsync repository")
                 return CONFIG_ERROR
-        remote_commits = remote_config["commits"]
-        remote_sync = remote_config["sync"]
+        remote_commits = remote_config.commits
+        remote_sync = remote_config.sync
 
         # missing_commits can be overwritten by pull or push
         if command_name == "push":
@@ -2565,6 +2622,16 @@ class YARsync():
             os.remove(self.HEADFILE)
         except FileNotFoundError:
             pass
+
+    def _write_repo_name(self, reponame, verbose=True):
+        # todo: if the path contains {}, it can lead to an error
+        repofile = self.REPOFILE.format(reponame)
+        if verbose:
+            self._print("# create configuration file {}".format(repofile))
+        with open(repofile, "x"):
+            pass
+        # return full path to the repository file
+        return repofile
 
     def _write_sync(self, sync, verbose=True):
         if verbose:
