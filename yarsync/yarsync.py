@@ -1548,6 +1548,7 @@ class YARsync():
             return self._reponame
 
         reponame = _get_repo_name_if_exists(config_dir=self.config_dir)
+        # todo: reponame must exist.
         if reponame is None:
             # platform.node() just calls socket.gethostname()
             # with an error check
@@ -1647,7 +1648,6 @@ class YARsync():
             new_config = False
 
         # create self.CONFIGFILE
-        # todo: create example configuration file.
         if not os.path.exists(self.CONFIGFILE):
             self._print("# create configuration file {}".format(self.CONFIGFILE))
             with open(self.CONFIGFILE, "w") as fil:
@@ -1658,22 +1658,21 @@ class YARsync():
                         level=2)
 
         # create repofile
-        # todo: is it repo file or name?..
-        repofile = _get_repo_name_if_exists(config_dir=self.config_dir)
-        if not repofile:
+        cur_reponame = _get_repo_name_if_exists(config_dir=self.config_dir)
+        if not cur_reponame:
             if not reponame:
-                self._print(
-                    "# (to use a repository name different from `hostname`"
-                    " for commit logs,\n"
-                    "#  provide it as an argument to 'init'"
-                    " or write it to {})".format(repofile)
-                )
-            else:
-                self._write_repo_name(reponame)
-                new_config = True
+                hostname = socket.gethostname()
+                reponame = input("Enter repository name [{}]:"
+                                 .format(hostname))
+                if not reponame:
+                    # default, no entry
+                    reponame = hostname
+            self._write_repo_name(reponame)
+            new_config = True
         else:
-            self._print("{} already exists, skip".format(repofile), level=2)
+            self._print("{} already exists, skip".format(cur_reponame), level=2)
 
+        # completely untested
         if merge:
             rsync_filter = "rsync-filter"
             dirs = os.listdir('.')
