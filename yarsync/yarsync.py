@@ -712,6 +712,10 @@ class YARsync():
                 except OSError as err:
                     # config dir not found.
                     if args.command_name == "clone":
+                        # clone from remote here.
+                        # We don't allow cloning into an existing
+                        # repository, because one would need to
+                        # add a filter then; it is more complicated
                         root_dir = ""
                     else:
                         _print_error(
@@ -779,8 +783,8 @@ class YARsync():
         # and group ids, so we don't push extraneous ids there.
         # Used in pull and push (and indirectly in clone).
         self.RSYNCOPTIONS = ["-avH", "--no-owner", "--no-group"]
-        # stores synchronization information
-        self.SYNCDIR = os.path.join(self.config_dir, "sync")
+        self.SYNCDIRNAME = "sync"
+        self.SYNCDIR = os.path.join(self.config_dir, self.SYNCDIRNAME)
         # SYNCSTR is defined in _Sync
         # self.SYNCFILE = os.path.join(self.config_dir, "sync.txt")
 
@@ -988,8 +992,18 @@ class YARsync():
         # 0. Check that remote directory doesn't exist
         repo_dir_name = os.path.basename(self.root_dir)
         path = os.path.join(parent_path, repo_dir_name)
-        # parent_path must exist on the remote
-        remote_files = self._get_remote_files(parent_path)
+        try:
+            # parent_path must exist and be readable
+            remote_files = self._get_remote_files(parent_path)
+        except OSError as err:
+            # hypothetically, we need only write access,
+            # but it would be safer to check
+            # the existence of the new path
+            _print_error(
+                "Parent folder of the repository could not be read "
+                "at {} . Aborting.".format(parent_path)
+            )
+            return COMMAND_ERROR
         if repo_dir_name in remote_files:
             _print_error(
                 "Repository folder already exists at {} . Aborting."
@@ -1369,6 +1383,7 @@ class YARsync():
         """
         # todo: path is probably not needed and not fully implemented
         # rename to _make_filter.
+        # rename include_commits to include_what?
         if path:
             rsync_filter = os.path.join(path, self.YSDIR, self.RSYNCFILTERNAME)
         else:
@@ -1387,6 +1402,7 @@ class YARsync():
             includes = [
                 "/".join([self.YSDIR, self.COMMITDIRNAME]),
                 "/".join([self.YSDIR, self.LOGDIRNAME]),
+                "/".join([self.YSDIR, self.SYNCDIRNAME]),
                 # "/.ys/logs"
             ]
             include_filters = ["--include={}".format(inc) for inc in includes]
@@ -2066,7 +2082,7 @@ class YARsync():
         local_commits = list(self._get_local_commits())
         local_sync = self._get_local_sync(verbose=True)
 
-        # get remote configuration. Note the trailing slash.
+        # get remote configuration. Note the trailing slash
         remote_config_dir = os.path.join(full_destpath, ".ys/")
         try:
             remote_config = self._get_remote_config(
@@ -2076,7 +2092,7 @@ class YARsync():
             )
         except OSError:
             if clone and command_name == "push":
-                # we can clone into an empty folder.
+                # we could clone into an empty folder,
                 # use an empty config for technical simplicity
                 remote_config = _Config({}, allow_empty=True)
             else:
@@ -2221,8 +2237,9 @@ class YARsync():
         elif new:
             last_remote_comm = max(remote_commits)
             if last_remote_comm in local_commits:
-                # remote commits are within locals (except some old ones)
-                # automatic checkout is forbidden,
+                # remote commits are within locals
+                # (except some old ones).
+                # Automatic checkout is forbidden,
                 # because it can delete files in the working directory
                 # despite --new . Examples: uncommitted files,
                 # interrupted (incomplete) commits.
@@ -2277,8 +2294,8 @@ class YARsync():
             try:
                 self._write_sync(local_sync)
             except OSError as err:
-                _print_error("data transferred, but could not log synchronization to "\
-                             + self.SYNCDIR)
+                _print_error("data transferred, but could not "
+                             "log synchronization to " + self.SYNCDIR)
 
         if not new and not dry_run:
             # --new means we've not fully synchronized yet.
