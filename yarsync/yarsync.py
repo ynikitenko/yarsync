@@ -514,9 +514,10 @@ class YARsync():
         # init #
         parser_init = subparsers.add_parser("init",
                                             help="initialize a repository")
-        parser_init.add_argument(
-            "--merge", action="store_true", help="merge existing repositories"
-        )
+        # add this option into the new release after improved testing.
+        # parser_init.add_argument(
+        #     "--merge", action="store_true", help="merge existing repositories"
+        # )
         # reponame is used during commits
         parser_init.add_argument(
             "reponame", nargs="?", metavar="<reponame>",
@@ -853,7 +854,11 @@ class YARsync():
                 )
         elif args.command_name == "init":
             # https://stackoverflow.com/a/41070441/952234
-            self._func = functools.partial(self._init, args.reponame, args.merge)
+            # disable merge for release 0.2.
+            self._func = functools.partial(self._init, args.reponame,
+                                           merge=False)
+            # self._func = functools.partial(self._init, args.reponame,
+            #                                merge=args.merge)
             # this also works, but lambdas can't be pickled
             # (even though we don't need that)
             # self._func = lambda: self._init(self._args.reponame)
