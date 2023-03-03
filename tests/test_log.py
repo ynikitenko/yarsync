@@ -50,12 +50,13 @@ def test_log(mocker):
     call = mocker.call
     assert res == 0
 
-    # the date on Python 3.6 is still different (see test_commit.py)
-    if sys.version_info.minor <= 6:
-        # will be UTC
-        time1_str = time.strftime(ys.DATEFMT, time.localtime(1))
-    else:
-        time1_str = "Thu, 01 Jan 1970 03:00:01 MSK"
+    # # the date on Python 3.6 is still different (see test_commit.py)
+    # if sys.version_info.minor <= 6:
+    #     # will be UTC
+    #     time1_str = time.strftime(ys.DATEFMT, time.localtime(1))
+    # else:
+    #     time1_str = "Thu, 01 Jan 1970 03:00:01 MSK"
+    time1_str = time.strftime(ys.DATEFMT, time.localtime(1))
     # this time is fixed in log
     time2_str = "Thu, 01 Jan 1970 03:00:02 MSK"
 

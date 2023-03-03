@@ -23,7 +23,7 @@ setuptools.setup(
     keywords="distributed, file, synchronization, rsync, backup",
     packages=setuptools.find_packages(exclude=['tests', 'tests.*']),
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production/Stable",
         "Environment :: Console", 
         "Intended Audience :: End Users/Desktop",
         "Intended Audience :: System Administrators",
@@ -35,6 +35,7 @@ setuptools.setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
         "Topic :: System :: Archiving",

@@ -88,11 +88,12 @@ def test_commit(mocker):
 
     # this seems patched, but the date on Python 3.6 is still different
     assert time.tzname == "MSK"
-    if sys.version_info.minor <= 6:
-        # will be UTC
-        time_str = time.strftime(ys.DATEFMT, time_3)
-    else:
-        time_str = "Thu, 01 Jan 1970 03:00:03 MSK"
+    # if sys.version_info.minor <= 6:
+    #     # will be UTC
+    #     time_str = time.strftime(ys.DATEFMT, time_3)
+    # else:
+    #     time_str = "Thu, 01 Jan 1970 03:00:03 MSK"
+    time_str = time.strftime(ys.DATEFMT, time.localtime(3))
 
     assert m.mock_calls == [
         # call(ys.REPOFILE),
