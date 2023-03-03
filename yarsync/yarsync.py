@@ -981,19 +981,14 @@ class YARsync():
         return returncode
 
     def _clone_to(self, remote, parent_path):
-        """Clone this repository to *path*.
+        """Clone this repository into *parent_path*.
 
-        *path* is the full path to the new repository.
-        Note that *destination* provided on the command line
-        is the parent directory of *path*, which is then joined
-        with the name of the local repository.
+        The full path to the new repository is *parent_path* joined
+        with the directory name of the local repository.
 
-        *remote* is the remote name added to the local configuration
-        and into synchronization information.
-
-        ?
-        Only data (working directory, commits and logs)
-        and *rsync-filter* will be cloned.
+        *remote* is the name of the cloned repository.
+        It is added to the local configuration
+        and into synchronization data.
         """
         # 0. Check that remote directory doesn't exist
         repo_dir_name = os.path.basename(self.root_dir)
@@ -1042,7 +1037,8 @@ class YARsync():
             try:
                 sync = self._sync
             except AttributeError:
-                # sync was not updated by push
+                # sync was not updated by push,
+                # can be when we have uncommitted changes, etc.
                 pass
             else:
                 sync.remove_repo(remote)
@@ -1052,6 +1048,7 @@ class YARsync():
 
         # 2. push to <remote>
         try:
+            # uncommitted changes, etc, will be checked here
             returncode = self._pull_push(
                 "push", remote, clone=True,
                 include_configs=include_configs,  # force=True,
@@ -1512,6 +1509,9 @@ class YARsync():
         The result does not contain '.' and '..'.
         Remote can be local.
         """
+        # we want to list directory contents, not just their names
+        if not path.endswith('/'):
+            path += '/'
         command = ["rsync", "--list-only"]
         if with_commits:
             # list commits, but not their contents
@@ -2288,19 +2288,22 @@ class YARsync():
 
         # update synchronization information locally
         if command_name == "pull" and not new and not dry_run:
-            local_sync.update(remote_sync.by_repos.items())
+            # we update "remote" sync, because it will be moved here
+            # and we need to update it with the local information
+            remote_sync.update(local_sync.by_repos.items())
             # we have some commits,
             # because otherwise that would mean uncommitted changes.
             last_commit = self._get_last_commit()
             local_repo = self._get_repo_name_local()
             # see todo for push
-            local_sync.update([
+            remote_sync.update([
                 (local_repo, last_commit),
                 (remote, last_commit)
             ])
             try:
-                self._write_sync(local_sync)
+                self._write_sync(remote_sync)
             except OSError as err:
+                _print_error(err.strerror)
                 _print_error("data transferred, but could not "
                              "log synchronization to " + self.SYNCDIR)
 
@@ -2677,10 +2680,10 @@ class YARsync():
                 # just create this file
                 pass
 
-        # we never write sync twice. New might be useful to store
-        # whether most recent local sync was updated or not.
-        # sync.new = set()
-        # sync.removed = set()
+        # we might write sync twice if we encounter an error
+        # (then we remove the wrong repo from sync)
+        sync.new = set()
+        sync.removed = set()
 
     def __call__(self):
         """Call the command set during the initialisation."""

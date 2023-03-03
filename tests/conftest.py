@@ -77,9 +77,9 @@ def test_dir_read_only():
 
 @pytest.fixture(scope="session")
 def test_dir_ys_bad_permissions():
-    dir_bad_perms = os.path.join(TEST_DIR_YS_BAD_PERMISSIONS, "forbidden")
-    os.chmod(dir_bad_perms, 0o000)
+    subdir_bad_perms = os.path.join(TEST_DIR_YS_BAD_PERMISSIONS, "forbidden")
+    os.chmod(subdir_bad_perms, 0o000)
     # we tear down later, because otherwise pytest will have problems
     # with searching in that directory
     yield TEST_DIR_YS_BAD_PERMISSIONS
-    os.chmod(dir_bad_perms, 0o544)
+    os.chmod(subdir_bad_perms, 0o544)
