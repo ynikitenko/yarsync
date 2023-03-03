@@ -358,6 +358,10 @@ class _Sync():
 
         return bc
 
+    def get_synced_repos_for(self, commit, exclude_repo=""):
+        return [repo for repo in self.by_commits()[commit]
+                if repo != exclude_repo]
+
     def remove_repo(self, repo):
         # repo is removed only from a clean state
         assert not self.new and not self.removed
@@ -947,7 +951,9 @@ class YARsync():
             return COMMAND_ERROR
         os.chdir(repo_dir_name)
         # initialize a new object
-        # to set the working and configuration directories
+        # to set the working and configuration directories.
+        # todo: create an initialization which would use
+        # verbosity from this object (self).
         ys = YARsync(["yarsync", "-qq", "init", name])
         # todo: rename reponame to name.
         ys._init(reponame=name)
@@ -1951,8 +1957,9 @@ class YARsync():
             if commit == head_commit:
                 commit_str += " (HEAD)"
             if commit in sync.by_repos.values():
-                other_repos = (repo for repo in sync.by_commits()[commit]
-                               if repo != local_repo)
+                other_repos = sync.get_synced_repos_for(
+                    commit, exclude_repo=local_repo
+                )
                 remote_str = ", ".join(other_repos)
                 commit_str += " <-> {}".format(remote_str)
 
@@ -2606,29 +2613,28 @@ class YARsync():
         sync = self._get_local_sync(verbose=not check_changed)
 
         if sync and not check_changed:
+            local_repo_name = self._get_repo_name_local()
             # if we only check for changes (to push or pull),
             # we are not interested in the commit synchronization status
             commits = list(self._get_local_commits())
             last_commit = self._get_last_commit(commits)
             if last_commit in sync.by_repos.values():
-                last_repos = ", ".join(sync.by_commits()[last_commit])
+                last_repos = sync.get_synced_repos_for(
+                    last_commit, exclude_repo=local_repo_name
+                )
                 self._print("\nCommits are up to date with {}."\
-                            .format(last_repos))
+                            .format(", ".join(last_repos)))
             else:
-                # last synchronized commit is present locally,
-                # if it is present in sync/ .
                 synced_commits = sync.by_repos.values()
-                # todo: fix tests or think over this possibility
-                # more thoroughly
                 if synced_commits:
                     last_synced_commit = max(synced_commits)
                     n_newer_commits = sum([1 for comm in commits
                                            if comm > last_synced_commit])
-                    last_repos = ", ".join(sync.by_commits()[last_synced_commit])
-                    # here we print a hash
-                    # to distinguish this line from others
+                    last_repos = sync.get_synced_repos_for(
+                        last_synced_commit, exclude_repo=local_repo_name
+                    )
                     self._print("Local repository is {} commits ahead of {}"\
-                                .format(n_newer_commits, last_repos))
+                                .format(n_newer_commits, ", ".join(last_repos)))
 
         # called from an internal method
         if check_changed:
