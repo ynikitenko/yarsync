@@ -926,8 +926,9 @@ class YARsync():
             _print_error("no yarsync repository found at {}".format(path))
             return COMMAND_ERROR
         except YSConfigurationError as err:
-            # todo: why is this not done in main?
-            _print_error(err.msg)
+            # the error is not printed in main,
+            # because here we can customize it better
+            _print_error("could not get remote configuration. " + err.msg)
             return CONFIG_ERROR
         remote_name = remote_config.repo_name
         if remote_name == name:
@@ -1497,6 +1498,7 @@ class YARsync():
             # )
             # return {"commits": [], "sync": _Sync([])}
 
+        # can raise YSConfigurationError
         remote_config = _Config(remote_files)
 
         # this is a getter. We set self._remote_config
@@ -2105,6 +2107,9 @@ class YARsync():
             else:
                 _print_error("remote contains no yarsync repository")
                 return CONFIG_ERROR
+        except YSConfigurationError as err:
+            _print_error("could not read remote configuration. " + err.msg)
+            return CONFIG_ERROR
         remote_commits = remote_config.commits
         remote_sync = remote_config.sync
 
