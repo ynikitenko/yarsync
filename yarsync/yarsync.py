@@ -384,10 +384,15 @@ class _Sync():
             sync_str = _syncstr.format(commit, repo)
             if repo in local:
                 if commit > local[repo]:
+                    # remove outdated local synchronization
+                    local_sync_str = _syncstr.format(local[repo], repo)
+                    removed.add(local_sync_str)
                     local[repo] = commit
                     new.add(sync_str)
-                elif commit < local[repo]:
-                    removed.add(sync_str)
+                # we don't delete synchronization
+                # that is not present locally
+                # elif commit < local[repo]:
+                #     removed.add(sync_str)
             else:
                 local[repo] = commit
                 new.add(sync_str)
@@ -1011,7 +1016,7 @@ class YARsync():
         if repo_dir_name in remote_files:
             _print_error(
                 "Repository folder already exists at {} . Aborting."
-                .format(parent_path)
+                .format(os.path.join(parent_path, repo_dir_name))
             )
             return COMMAND_ERROR
 
@@ -1458,7 +1463,7 @@ class YARsync():
 
     def _get_local_commits(self):
         """Return local commits as an iterable of integers."""
-        # todo: cache results.
+        # todo: cache results. But note that it is used in pull.
         try:
             commit_candidates = os.listdir(self.COMMITDIR)
         except OSError:
@@ -2324,8 +2329,7 @@ class YARsync():
             # we update "remote" sync, because it will be moved here
             # and we need to update it with the local information
             remote_sync.update(local_sync.by_repos.items())
-            # we have some commits,
-            # because otherwise that would mean uncommitted changes.
+            # last_commit is calculated including the pulled ones
             last_commit = self._get_last_commit()
             # see todo for push
             remote_sync.update([
@@ -2704,7 +2708,7 @@ class YARsync():
         return repofile
 
     def _write_sync(self, sync, verbose=True):
-        if verbose:
+        if verbose and (sync.new or sync.removed):
             self._print("update synchronization:")
         for sync_str in sync.removed:
             if verbose:
