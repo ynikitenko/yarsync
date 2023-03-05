@@ -76,6 +76,7 @@ def test_status_no_commits(mocker):
     call = mocker.call
     assert res == 0
     assert mocker_print.mock_calls == [
+        call.write('In repository myhost'), call.write('\n'),
         call.write('No commits found'), call.write('\n')
     ]
 

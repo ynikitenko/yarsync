@@ -1026,7 +1026,10 @@ class YARsync():
         self._configdict[remote] = {}
         self._configdict[remote]["destpath"] = path
         # cache repo name before creating another file for that
-        self._get_repo_name_local()
+        try:
+            self._get_repo_name_local()
+        except YSConfigurationError:
+            return CONFIG_ERROR
         # temporarily create a repo file to transfer it
         remote_repo_file = self._write_repo_name(remote, verbose=False)
         # todo: maybe optionally transfer config
@@ -1134,7 +1137,10 @@ class YARsync():
         older commits and logs will be removed.
         """
 
-        reponame = self._get_repo_name_local()
+        try:
+            reponame = self._get_repo_name_local()
+        except YSConfigurationError:
+            return CONFIG_ERROR
 
         username = getpass.getuser()
         time_str = time.strftime(self.DATEFMT, time.localtime())
@@ -1579,6 +1585,10 @@ class YARsync():
         reponame = _get_repo_name_if_exists(config_dir=self.config_dir)
         # todo: reponame must exist.
         if reponame is None:
+            err_msg = ("Could not find repository name. "
+                       "Provide one with init.")
+            _print_error(err_msg)
+            raise YSConfigurationError(msg=err_msg)
             # platform.node() just calls socket.gethostname()
             # with an error check
             reponame = socket.gethostname()
@@ -1699,6 +1709,12 @@ class YARsync():
             self._write_repo_name(reponame)
             new_config = True
         else:
+            if reponame and cur_reponame != reponame:
+                _print_error(
+                    "a different repository name {} already exists. Aborting"
+                    .format(cur_reponame)
+                )
+                return COMMAND_ERROR
             self._print("{} already exists, skip".format(cur_reponame), level=2)
 
         # completely untested
@@ -1898,8 +1914,12 @@ class YARsync():
         sync = self._get_local_sync(verbose=True)
         head_commit = self._get_head_commit()
 
-        def print_logs(commit_log_list):
+        try:
             local_repo = self._get_repo_name_local()
+        except YSConfigurationError:
+            return CONFIG_ERROR
+
+        def print_logs(commit_log_list):
             for ind, (commit, log) in enumerate(commit_log_list):
                 if ind:
                     print()
@@ -2016,6 +2036,13 @@ class YARsync():
                 "local repository has unmerged changes.\n"
                 "Manually update the working directory and *commit*."
             )
+
+        # otherwise will be called in _status below
+        try:
+            local_repo = self._get_repo_name_local()
+        except YSConfigurationError:
+            # the error is printed
+            return CONFIG_ERROR
 
         if not (new or force):
             returncode, changed = self._status(check_changed=True)
@@ -2156,8 +2183,6 @@ class YARsync():
         else:
             stdout = subprocess.DEVNULL
 
-        self._print_command(command, level=3)
-
         # push synchronization information to the remote
         if command_name == "push" and not new and not dry_run:
             # forbid --new sync update,
@@ -2165,7 +2190,6 @@ class YARsync():
             # Obsolete local sync will be removed.
             local_sync.update(remote_sync.by_repos.items())
             last_commit = self._get_last_commit()
-            local_repo = self._get_repo_name_local()
             # todo: get remote name from remote .ys/repo_<name>
             # forbid several files with such name
             local_sync.update([
@@ -2183,6 +2207,7 @@ class YARsync():
 
         # ----------------------------------------------------------
         #         Run
+        self._print_command(command, level=3)
         completed_process = subprocess.Popen(command, stdout=stdout)
         # ----------------------------------------------------------
 
@@ -2299,7 +2324,6 @@ class YARsync():
             # we have some commits,
             # because otherwise that would mean uncommitted changes.
             last_commit = self._get_last_commit()
-            local_repo = self._get_repo_name_local()
             # see todo for push
             remote_sync.update([
                 (local_repo, last_commit),
@@ -2495,6 +2519,15 @@ class YARsync():
         # We don't return an error if the directory has changed,
         # because it is a normal situation (not an error).
         # This is the same as in git.
+        try:
+            local_repo_name = self._get_repo_name_local()
+        except YSConfigurationError as err:
+            if not check_changed:
+                return CONFIG_ERROR
+            # should return a tuple, but see no use for it in this case
+            raise err
+        else:
+            self._print("In repository " + local_repo_name)
 
         if os.path.exists(self.COMMITDIR):
             commit_subdirs = [fil for fil in os.listdir(self.COMMITDIR)
@@ -2621,7 +2654,6 @@ class YARsync():
         sync = self._get_local_sync(verbose=not check_changed)
 
         if sync and not check_changed:
-            local_repo_name = self._get_repo_name_local()
             # if we only check for changes (to push or pull),
             # we are not interested in the commit synchronization status
             commits = list(self._get_local_commits())
