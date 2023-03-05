@@ -913,6 +913,7 @@ class YARsync():
         The new repository will be called *name* and
         have the origin as a remote.
         """
+        path = _substitute_env(path).getvalue()
         if path.endswith('/'):
             path = path[:-1]
         repo_dir_name = os.path.basename(path)
@@ -993,6 +994,7 @@ class YARsync():
         """
         # 0. Check that remote directory doesn't exist
         repo_dir_name = os.path.basename(self.root_dir)
+        parent_path = _substitute_env(parent_path).getvalue()
         path = os.path.join(parent_path, repo_dir_name)
         try:
             # parent_path must exist and be readable
@@ -1030,6 +1032,7 @@ class YARsync():
             self._get_repo_name_local()
         except YSConfigurationError:
             return CONFIG_ERROR
+
         # temporarily create a repo file to transfer it
         remote_repo_file = self._write_repo_name(remote, verbose=False)
         # todo: maybe optionally transfer config
