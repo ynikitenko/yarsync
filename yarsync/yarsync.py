@@ -143,10 +143,10 @@ def _get_repo_name_if_exists(file_list=None, config_dir=""):
         # format of REPOFILE
         if fil.startswith("repo_") and fil.endswith(".txt"):
             if reponame is not None:
-                raise YSConfigurationError(
-                    "several repository names found, {} and {}"
-                    .format(reponame, fil)
-                )
+                err_msg = "several repository names found, {} and {}"\
+                          .format(reponame, fil)
+                _print_error(err_msg)
+                raise YSConfigurationError(err_msg)
             reponame = fil[5:-4]
     # todo: assert reponame
     return reponame
@@ -1022,7 +1022,8 @@ class YARsync():
 
         # 1. Add remote <remote>
         # We don't check that remote is not in sync,
-        # because we might want to clone same repo anew (hypothetically)
+        # because we might want to clone same repo anew (hypothetically).
+        # Important to call it before using self._configdict
         returncode = self._remote_add(remote, path)
         if returncode:
             # all errors were printed in _remote_add
@@ -1036,6 +1037,7 @@ class YARsync():
         try:
             self._get_repo_name_local()
         except YSConfigurationError:
+            self._remote_rm(remote)
             return CONFIG_ERROR
 
         # temporarily create a repo file to transfer it
