@@ -10,7 +10,7 @@ from yarsync.yarsync import (
 )
 
 from .helpers import clone_repo
-from .settings import TEST_DIR, TEST_DIR_FILTER
+from .settings import TEST_DIR, TEST_DIR_FILTER  # , TEST_DIR_YS_BAD_PERMISSIONS
 
 
 def test_clone_from(tmp_path_factory, capfd):
@@ -116,14 +116,19 @@ def test_clone_errors(tmp_path_factory, capfd, test_dir_ys_bad_permissions):
     assert "directory test_dir exists, aborting" in capfd.readouterr().err
 
     ## Can't clone from inside a repository with bad permissions
-    bad_perm_source = test_dir_ys_bad_permissions
+    bad_perm_source = str(tmp_path_factory.mktemp("bad_perm"))
+    # we can't use TEST_DIR_YS_BAD_PERMISSIONS here,
+    # because we can't clone it :)
+    clone_repo(TEST_DIR, bad_perm_source)
     dest2 = str(tmp_path_factory.mktemp("dest"))
     os.chdir(bad_perm_source)
+    os.chmod("c", 0o000)
     ys2 = YARsync(clone_command + ["clone", dest2])
     # this is COMMAND_ERROR, because there are uncommitted changes
     assert ys2._clone_to("clone", dest2) == COMMAND_ERROR  # rsync_return
     captured = capfd.readouterr()
     assert "local repository has uncommitted changes. Exit." in captured.err
+    os.chmod("c", 0o777)
 
     ### Test clone_to ###
     ## Can't clone from a repository with bad permissions

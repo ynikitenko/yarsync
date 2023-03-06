@@ -139,9 +139,21 @@ def _get_repo_name_if_exists(file_list=None, config_dir=""):
         file_list = os.listdir(config_dir)
     reponame = None
 
+    # a list for generality, if we are doing several clones
+    cloning_to = []
+    for fil in file_list:
+        # format of CLONETOFILE
+        if fil.startswith("CLONE_TO_") and fil.endswith(".txt"):
+            print("cloning to {}".format(fil[9:-4]))
+            cloning_to.append(fil[9:-4])
+
     for fil in file_list:
         # format of REPOFILE
         if fil.startswith("repo_") and fil.endswith(".txt"):
+            # if we are cloning there, it is not this repo name.
+            _reponame = fil[5:-4]
+            if _reponame in cloning_to:
+                continue
             if reponame is not None:
                 err_msg = (
                     "several repository names found, {} and {} . "\
@@ -149,7 +161,7 @@ def _get_repo_name_if_exists(file_list=None, config_dir=""):
                 )
                 _print_error(err_msg)
                 raise YSConfigurationError(err_msg)
-            reponame = fil[5:-4]
+            reponame = _reponame
     # todo: assert reponame
     return reponame
 
@@ -774,6 +786,7 @@ class YARsync():
         # - just skipped (and will be set correctly by the OS).
         # self.DIRMODE = 0o755
 
+        self.CLONETOFILE = os.path.join(self.config_dir, "CLONE_TO_{}.txt")
         self.COMMITDIRNAME = "commits"
         self.COMMITDIR = os.path.join(self.config_dir, self.COMMITDIRNAME)
         self.CONFIGFILE = os.path.join(self.config_dir, "config.ini")
@@ -1045,6 +1058,11 @@ class YARsync():
 
         # temporarily create a repo file to transfer it
         remote_repo_file = self._write_repo_name(remote, verbose=False)
+        clone_to_file = self.CLONETOFILE.format(remote)
+        self._print("# create a temporary file {}".format(clone_to_file))
+        with open(clone_to_file, "x"):
+            pass
+
         # todo: maybe optionally transfer config
         # (without the new remote) as well
         include_configs = [os.path.basename(remote_repo_file)]
@@ -1078,6 +1096,7 @@ class YARsync():
             raise e
         finally:
             os.remove(remote_repo_file)
+            os.remove(clone_to_file)
 
         if returncode:
             remote_rm()
