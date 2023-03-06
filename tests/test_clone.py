@@ -202,3 +202,41 @@ def test_clone_errors(tmp_path_factory, capfd, test_dir_ys_bad_permissions):
     # # see https://github.com/pytest-dev/pytest/issues/7821
     # bad_dir = os.path.join(dest1, "forbidden")
     # os.chmod(bad_dir, stat.S_IWRITE)
+
+
+def test_clone_with_env_path(tmp_path_factory):
+    ### Clone from path with an environmental variable
+    ### preserves that variable in the configuration
+    test_dir = tmp_path_factory.mktemp("test_dir")
+    test_dir_name = os.path.basename(test_dir)
+    clone_repo(str(TEST_DIR), str(test_dir))
+    clone_command = ["yarsync", "clone"]
+
+    ## Clone from path with an envvar works
+    dest1 = tmp_path_factory.mktemp("dest")
+    os.chdir(dest1)
+    os.environ["TEST_DIR"] = str(test_dir)
+    ys1 = YARsync(clone_command + ["clone", "$TEST_DIR"])
+    return_code = ys1()
+    assert not return_code
+
+    # remove the variable, so that it is no longer expanded in _config
+    del os.environ["TEST_DIR"]
+    ys11 = YARsync("yarsync remote show".split())
+    ys11()
+    # it is TEST, because it is the name of origin.
+    assert ys11._config["TEST"]["path"] == "$TEST_DIR"
+
+    ## Clone to path with an envvar works
+    dest2 = tmp_path_factory.mktemp("dest2")
+    os.environ["DEST2"] = str(dest2)
+    # we are still in dest1
+    ys2 = YARsync(["yarsync", "clone", "clone2", "$DEST2"])
+    return_code = ys2()
+    assert not return_code
+
+    del os.environ["DEST2"]
+    ys21 = YARsync("yarsync remote show".split())
+    ys21()
+    assert ys21._config["clone2"]["path"] == \
+           os.path.join("$DEST2", test_dir_name)

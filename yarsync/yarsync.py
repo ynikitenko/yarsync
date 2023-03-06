@@ -143,8 +143,10 @@ def _get_repo_name_if_exists(file_list=None, config_dir=""):
         # format of REPOFILE
         if fil.startswith("repo_") and fil.endswith(".txt"):
             if reponame is not None:
-                err_msg = "several repository names found, {} and {}"\
-                          .format(reponame, fil)
+                err_msg = (
+                    "several repository names found, {} and {} . "\
+                    .format(reponame, fil) + "They could be left after clone"
+                )
                 _print_error(err_msg)
                 raise YSConfigurationError(err_msg)
             reponame = fil[5:-4]
@@ -918,6 +920,7 @@ class YARsync():
         The new repository will be called *name* and
         have the origin as a remote.
         """
+        orig_path = path
         path = _substitute_env(path).getvalue()
         if path.endswith('/'):
             path = path[:-1]
@@ -966,7 +969,7 @@ class YARsync():
         ys._init(reponame=name)
 
         # add remote *remote_name* and pull data from there
-        ys._remote_add(remote_name, path)
+        ys._remote_add(remote_name, orig_path)
         # todo: fix configuration update during remote_add.
         ys_pull = YARsync(["yarsync", "-qq", "pull", remote_name])
         # possible exceptions will raise from _pull_push,
@@ -999,18 +1002,18 @@ class YARsync():
         """
         # 0. Check that remote directory doesn't exist
         repo_dir_name = os.path.basename(self.root_dir)
-        parent_path = _substitute_env(parent_path).getvalue()
+        eparent_path = _substitute_env(parent_path).getvalue()
         path = os.path.join(parent_path, repo_dir_name)
         try:
             # parent_path must exist and be readable
-            remote_files = self._get_remote_files(parent_path)
+            remote_files = self._get_remote_files(eparent_path)
         except OSError as err:
             # hypothetically, we need only write access,
             # but it would be safer to check
             # the existence of the new path
             _print_error(
                 "Parent folder of the repository could not be read "
-                "at {} . Aborting.".format(parent_path)
+                "at {} . Aborting.".format(eparent_path)
             )
             return COMMAND_ERROR
         if repo_dir_name in remote_files:
@@ -1032,7 +1035,7 @@ class YARsync():
         # We could have made it an argument for _pull_push,
         # but it may use config for finer transfer options.
         self._configdict[remote] = {}
-        self._configdict[remote]["destpath"] = path
+        self._configdict[remote]["destpath"] = _substitute_env(path).getvalue()
         # cache repo name before creating another file for that
         try:
             self._get_repo_name_local()
@@ -1063,6 +1066,8 @@ class YARsync():
         # 2. push to <remote>
         try:
             # uncommitted changes, etc, will be checked here
+            # todo: maybe clone and other arguments
+            # should be available for testing from command line
             returncode = self._pull_push(
                 "push", remote, clone=True,
                 include_configs=include_configs,  # force=True,
@@ -2362,8 +2367,6 @@ class YARsync():
         # no value is allowed
         # for a configuration key "host_from_section_name"
         config = configparser.ConfigParser(allow_no_value=True)
-        # ConfigParser.read_string
-        # is undocumented in Python2, but present!
         config.read_string(subst_lines)
 
         # todo !!: only one of config or configdict must be used!
