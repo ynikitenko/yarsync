@@ -374,7 +374,6 @@ Finally, if you need several versions,
 just save one of the files under a different name in the repository.
 
     After you have fixed all corrupt files, push them back to the remote.
-See the **\--overwrite** option for propagation of file changes.
 
 #### pull and push options
 
@@ -497,6 +496,16 @@ from the working directory.
 This may be convenient, but makes synchronization less reliable,
 and such repository can not be used as a remote.
 See **rsync-filter** in the FILES section for more details.
+
+A repository can have a fixed maximum number of commits.
+**commit limit** can be set during **commit**.
+**pull** and **push** do not check for missing commits on the destination
+when we are in a repository with commit limit.
+It makes a repository with commit limit be more like a central repository.
+If we have reached the maximum number of commits,
+older ones are deleted during a new **commit**.
+Commit limit was introduced in ``yarsync v0.2``
+and designed to help against the problem of too many hard links (if it is present).
 
 ## FILES
 

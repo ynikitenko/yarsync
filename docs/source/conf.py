@@ -9,7 +9,7 @@
 project = 'YARsync'
 copyright = '2021-2023, Yaroslav Nikitenko'
 author = 'Yaroslav Nikitenko'
-release = '0.2-beta'
+release = '0.2'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

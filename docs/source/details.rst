@@ -6,7 +6,7 @@ Advanced
 Usage tips
 -----------
 
-Since ``yarsync`` allows to use a command interface similar to ``git``,
+Since ``yarsync`` allows using a command interface similar to ``git``,
 one can synchronize several repositories simultaneously using
 `myrepos <https://myrepos.branchable.com/>`_.
 
@@ -29,15 +29,8 @@ Development
 ------------
 
 Community contributions are very important for free software projects.
-
-If you find this tool useful and want to fix an existing or unknown issue,
-clone the repository and install Python packages for tests:
-
-.. code-block:: console
-
-    pip install -r requirements.txt
-
-.. To propose a feature, please open a new issue first for a design discussion.
+The best thing for the project on the starting phase is to spread information
+and create packages for new operating systems.
 
 ``yarsync`` was tested on ext4, NFSv4 and SimFS on Arch Linux and CentOS.
 Tests on other systems would be useful.
@@ -51,12 +44,19 @@ Multiple hard links are supported by POSIX-compliant and partially POSIX-complia
 such as Linux, Android, macOS, and also Windows NT4 and later Windows NT operating systems
 [`Wikipedia <https://en.wikipedia.org/wiki/Hard_link>`_].
 
-Notable file systems to **support hard links** include [`hard links <https://en.wikipedia.org/wiki/Hard_link>`_ and `comparison of file systems <https://en.wikipedia.org/wiki/Comparison_of_file_systems#File_capabilities>`_ from Wikipedia]:
+Notable file systems to **support hard links** include
+[`hard links <https://en.wikipedia.org/wiki/Hard_link>`_ and
+`comparison of file systems <https://en.wikipedia.org/wiki/Comparison_of_file_systems#File_capabilities>`_
+from Wikipedia]:
 
-* EncFS (an Encrypted Filesystem using FUSE). Note that it doesn't support hard links `when External IV Chaining is enabled <https://github.com/vgough/encfs/blob/master/encfs/encfs.pod>`_ (this is enabled by default in paranoia mode, and disabled by default in standard mode).
-* ext2-ext4. Standard on Linux. Ext4 has a limit of `65000 hard links <https://en.wikipedia.org/wiki/Hard_link#Limitations_of_hard_links>`_ on a file.
+* EncFS (an Encrypted Filesystem using FUSE). Note that it doesn't support hard links
+  `when External IV Chaining is enabled <https://github.com/vgough/encfs/blob/master/encfs/encfs.pod>`_
+  (this is enabled by default in paranoia mode, and disabled by default in standard mode).
+* ext2-ext4. Standard on Linux. Ext4 has a limit of
+  `65000 hard links <https://en.wikipedia.org/wiki/Hard_link#Limitations_of_hard_links>`_ on a file.
 * HFS+. Standard on Mac OS.
-* NTFS. The only Windows file system to support hard links. It has a limit of `1024 hard links <https://en.wikipedia.org/wiki/NTFS>`_ on a file.
+* NTFS. The only Windows file system to support hard links.
+  It has a limit of `1024 hard links <https://en.wikipedia.org/wiki/NTFS>`_ on a file.
 * SquashFS, a compressed read-only file system for Linux.
 
 Hard links are **not supported** on:

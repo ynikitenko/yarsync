@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 ***********************************
-Welcome to YARsync's documentation!
+Welcome to YARsync documentation!
 ***********************************
 
 ..
