@@ -12,6 +12,7 @@ YARsync is a Free Software project covered by the GNU General Public License ver
 -------------
 Installation
 -------------
+``yarsync`` is packaged for Debian/Ubuntu.
 
 For Arch Linux, install the ``yarsync`` package `from AUR <https://aur.archlinux.org/packages/yarsync>`_.
 Packages for other distributions are welcome.
@@ -105,6 +106,8 @@ safe
   (*--dry-run*).
   Removed files are stored in older commits
   (until the user explicitly removes those).
+
+..
   If a file gets corrupt, it will not be transferred by default,
   but when the user chooses to *pull --backup*, any diverged files will be visible
   (with their different versions preserved).
@@ -161,10 +164,12 @@ Documentation
 -------------
 
 For the complete documentation, read the installed
-or online `manual <https://ynikitenko.github.io/yarsync/man>`_.
+or online `manual <https://yarsync.readthedocs.io/en/latest/yarsync.1.html>`_.
 
 For more in-depth topics or alternatives, see
-`details <https://ynikitenko.github.io/yarsync/details>`_.
+`details <https://yarsync.readthedocs.io/en/latest/details.html>`_.
+
+On github pages there is the manual for `yarsync 0.1 <https://ynikitenko.github.io/yarsync/man>`_.
 
 An article in Russian that deals more with ``yarsync`` internals was posted
 on `Habr <https://habr.com/ru/post/662163/>`_.

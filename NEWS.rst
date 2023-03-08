@@ -49,37 +49,48 @@ Improvements
 Backward incompatible changes
 -----------------------------
 
-* clone semantics changed.
-  sets name of the cloned repository.
-* Turns off "overwrite" (--ignore-existing) functionality.
+* ``clone`` command and interface changed. ``clone`` allows copying to a remote.
+  New repository name must be provided explicitly.
+* Turns off ``pull/push`` *--overwrite* (``rsync`` *--ignore-existing*) functionality.
   Waiting for https://github.com/WayneD/rsync/issues/357 to be fixed.
-* Name is required for each repository. This assists synchronization.
-* Repository name is no longer stored in repository.txt, but in repo_<name>.txt.
+* Name for each repository is required (to assist synchronization).
+* Repository name is no longer stored in *repository.txt*, but in *repo_<name>.txt*.
   This allows to know remote repository names from listing their configuration files.
 
 Technical changes
 -----------------
-* yarsync is tested for Python 3.11.
+Documentation has been moved to ReadTheDocs.
 
-* yarsync development classifier on PyPI becomes "5 - Production/Stable".
+* ``yarsync`` is tested for Python 3.11.
 
-* Adds .gitattributes (to log revisions of functions).
+* ``yarsync`` development classifier on PyPI becomes "5 - Production/Stable".
 
-* Test improvements:
+* Adds *.gitattributes* (to log revisions of functions).
 
-  * Adds helpers.py (for cloning test repositories). Removes test_real_copy.py.
+* Tests improvements:
+
+  * Adds *helpers.py* (for cloning test repositories).
   * Fixes hardlink fixtures. 
 
-* Implements init --merge option. It is not tested and shall be added in the next release.
-* _print_command accepts lists and properly escapes commands with spaces.
+* Implements ``init`` *--merge* option. It is not tested and shall be added in the next release.
+* *_print_command* accepts lists and properly escapes commands with spaces.
   String and list representations of commands are no longer needed.
-* _commit method accepts arguments explicitly.
+* *_commit* method accepts arguments explicitly.
 * Adds *_Config* and *_Sync* helper classes.
 
 * Documentation improvements:
 
   * Adds a howto for synchronizing repositories after adding external data to both of them (see details).
   * Documentation uses Sphinx. Needs fixes for pdf version.
+
+Publication
+-----------
+``yarsync`` v0.1 was packaged for Arch Linux, Debian and PyPI (and will be updated for v0.2).
+
+A talk on ``yarsync`` was made at the Winter seminar of the Physics Institute of the RWTH Aachen University
+in Montafon on February 2023.
+
+The program was announced on the ``rsync`` mailing list, published on Arch Wiki and Arch Forum.
 
 ===========================
 YARsync 0.1.1+deb

@@ -613,13 +613,13 @@ class YARsync():
                 help="print what would be transferred during a real run, "
                      "but do not make any change"
             )
-            pparser.add_argument(
-                # not sure whether -o would be a good shortening
-                # (-o might go for options)
-                "--overwrite", action="store_true",
-                default=False,
-                help="propagate file changes"
-            )
+            # pparser.add_argument(
+            #     # not sure whether -o would be a good shortening
+            #     # (-o might go for options)
+            #     "--overwrite", action="store_true",
+            #     default=False,
+            #     help="propagate file changes"
+            # )
 
         # remote #
         parser_remote = subparsers.add_parser(
@@ -908,7 +908,7 @@ class YARsync():
                 # common options
                 self._pull_push, args.command_name, remote,
                 dry_run=args.dry_run,
-                force=args.force, overwrite=args.overwrite,
+                force=args.force,  # overwrite=args.overwrite,
                 # pull options
                 new=new, backup=backup, backup_dir=backup_dir
             )
@@ -2056,6 +2056,8 @@ class YARsync():
         check that with *-n* (*--dry-run*) first!
 
         *backup*, *backup_dir* and *new* only apply to pull.
+
+        *overwrite* is temporarily disabled until rsync fixes.
         """
 
         if self._get_head_commit() is not None:
