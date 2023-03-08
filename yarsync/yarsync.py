@@ -313,7 +313,7 @@ class _Config():
             )
         self.commits = commits
         self.sync = sync
-        # ignore other files
+        self._file_list = file_list
 
 
 class _Sync():
@@ -951,6 +951,13 @@ class YARsync():
             # the error is not printed in main,
             # because here we can customize it better
             _print_error("could not get remote configuration. " + err.msg)
+            return CONFIG_ERROR
+        if "rsync-filter" in remote_config._file_list:
+            _print_error(
+                "Remote configuration contains rsync-filter.\n  "
+                "Initialize a new repository and copy the filter manually,\n  "
+                "then add the remote and pull data from there."
+            )
             return CONFIG_ERROR
         remote_name = remote_config.repo_name
         if remote_name == name:

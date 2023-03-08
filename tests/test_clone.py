@@ -6,7 +6,8 @@ import pytest
 from yarsync import YARsync
 from yarsync.yarsync import _is_commit, _substitute_env
 from yarsync.yarsync import (
-    CONFIG_EXAMPLE, YSConfigurationError, YSCommandError, COMMAND_ERROR
+    CONFIG_EXAMPLE, YSConfigurationError, YSCommandError,
+    CONFIG_ERROR, COMMAND_ERROR
 )
 
 from .helpers import clone_repo
@@ -49,6 +50,13 @@ def test_clone_from(tmp_path_factory, capfd):
     # no errors were issued
     captured = capfd.readouterr()
     assert not captured.err
+
+    ## Can't clone from a directory with filter
+    dest3 = tmp_path_factory.mktemp("dest")
+    os.chdir(dest3)
+    ys3 = YARsync(["yarsync", "clone", "clone", TEST_DIR_FILTER])
+    return_code = ys3()
+    assert return_code == CONFIG_ERROR
 
 
 @pytest.mark.parametrize(
