@@ -52,37 +52,30 @@ Hard links are excellent at tracking file moves or renames
 and storing accidentally removed files.
 Their downside is that if a file gets corrupt,
 this will apply to all of its copies in local commits.
-The 3-2-1 backup rule implies that one should have at least 3 copies of data,
+The 3-2-1 backup rule requires to have at least 3 copies of data,
 so let us add a remote repository \"my\_remote\":
 
     yarsync remote add my_remote remote:/path/on/my/remote
 
 For local copies we still call the repositories \"remote\",
-but their paths will be local:
+but their paths would be local:
 
     yarsync remote add my_drive /mnt/my_drive/my_repo
 
 This command only updated our configuration,
 but did not make any changes at the remote path (which may not exist).
-To make a local copy of our repository, run
+To make a copy of our repository, run
 
-    yarsync clone . /mnt/my_drive/my_repo
+    yarsync clone new-replica-name host:/mnt/my_drive/my_repo
 
-**clone** copies all repository data (except the configuration) to the new replica
-and adds the original repository to its remotes with the name \"origin\".
-To copy the repository to a remote host, just copy its files (preserving hard links):
+**clone** copies all repository data (except configuration files) to a new replica
+with the given name and adds the new repository to remotes.
 
-    rsync -avHP ./ remote:/path/on/my/remote
-
-Here \'**-H**\' stands for hard links. If the first path ends with
-a slash, data will be copied to \"remote/\", otherwise to its subdirectory.
-Similarly, one can copy a repository *from* a remote: just change the order of paths
-and don't forget about the slash.
 To check that we set up the repositories correctly, make a dry run with \'**-n**\':
 
-    yarsync push -n my_remote
+    yarsync push -n new-replica-name
 
-If there are no errors and no file transfers, then we have a functioning remote.
+If there were no errors and no file transfers, then we have a functioning remote.
 We can continue working locally, adding and removing files and making commits.
 When we want to synchronize repositories, we **push** the changes *to*
 or **pull** them *from* a remote (first with a **\--dry-run**).
@@ -148,7 +141,7 @@ Conflicts with **\--quiet**.
 ## COMMANDS
 
 All commands support the **\--help** option.
-Commands that can change the repository also support the **\--dry-run** option.
+Commands that can change a repository also support the **\--dry-run** option.
 
 **\--dry-run**, **-n**
 : Prints what will be transferred during a real run, but does not make any changes.
@@ -176,37 +169,43 @@ or make a new one.
 
 ## clone
 
-**yarsync clone** \[**-h**] \[**-o** *origin*] \[**-n** *clone*] *repository* *directory*
+**yarsync clone** \[**-h**] *name* *path|parent path*
 
-Clones a *repository* to a *directory*.
-Non-existent paths will be created.
-Non-empty directories will be unchanged (and an error will be issued).
+One can clone from within an existing repository **to** *parent path*
+or clone **from** a repository at *path*.
+In both cases a new directory with the repository is created,
+having the same name as the original repository folder.
+If that directory already exists, **clone** will fail
+(several safety checks are being made).
+The local repository (origin or clone) will add another one as a remote.
 
-Note that only data (working directory, commits and logs,
+Note that only data (working directory, commits, logs and synchronization information,
 not configuration files) will be cloned.
-This command will refuse to clone a repository with a filter (see SPECIAL REPOSITORIES).
+This command will refuse to clone **from** a repository with a filter (see SPECIAL REPOSITORIES).
+
+*parent path* is useful when we want to clone several repositories into one directory.
+It allows us to use the same command for each of them (manually or with **mr**(1)).
 
 #### Positional arguments
-*repository*
-: A path to the source repository (local or remote).
 
-*directory*
-: A path to the cloned local repository.
-If *directory* ends with a \'**/**\', the new repository will be created
-as its subdirectory with the name taken from the last part of the repository path.
+*name*
+: Name of the new repository.
 
-#### Options
-**\--origin**=*origin*, **-o**
-: Name of the remote repository for the cloned one (by default \"origin\").
+*path*
+: Path to the source repository (local or remote). Trailing slash is ignored.
 
-**\--name**=*clone*, **-n**
-: Name of the new repository (as it could be named during **init**).
+*parent path*
+: Path to the parent directory of the cloned repository (local or remote).
+Trailing slash is ignored.
 
 ## commit
-**yarsync commit** \[**-h**] \[**-m** *message*]
+**yarsync commit** \[**-h**] \[**-m** *message*] \[**--limit** *number*]
 
 Commits the working directory (makes its snapshot).
 See QUICK START for more details on commits.
+
+**\--limit**=*number*
+: Maximum number of commits.
 
 *message*
 : Commit message (used in logs). Can be empty.
@@ -229,11 +228,11 @@ See **status** for the output format.
 
 Initializes a **yarsync** repository in the current directory.
 Creates a configuration folder with repository files.
-Existing configuration and files in the working directory are unchanged.
+Existing configuration and files in the working directory stay unchanged.
 Create a first commit for the repository to become fully operational.
 
 *reponame*
-: Name of the repository (logged during commits).
+: Name of the repository. If not given on the command line, it will be prompted.
 
 ## log
 
@@ -259,7 +258,7 @@ To print information about the three most recent commits, use
 
 ## pull
 
-**yarsync pull** \[**-h**] \[**-f** | **\--new** | **-b** | **\--backup-dir** *DIR*] [**-n**] \[**\--overwrite**] *source*
+**yarsync pull** \[**-h**] \[**-f** | **\--new** | **-b** | **\--backup-dir** *DIR*] [**-n**] *source*
 
 Gets data from a remote *source*.
 The difference between **pull** and **push** is mostly only the direction of transfer.
@@ -389,21 +388,11 @@ While working directories are always identical after **pull** or **push**
 this option is given.
 Use it if the destination has really unneeded commits
 or just remove them manually (see FILES for details on the commit directory).
-See also **pull \--new** on how to fetch missing commits
-and **\--overwrite** on synchronizing file contents.
-
-**\--overwrite**
-: Propagates file changes.
-By default, files in a **yarsync** repository are not changed,
-therefore actual changes are not transferred to other repositories
-to prevent file corruption.
-If you are confident that the local files for **push** (or remote ones for **pull**)
-are correct (for example, you just repaired them with the **\--backup** options),
-you can synchronize changes with this option.
+See also **pull \--new** on how to fetch missing commits.
 
 ## push
 
-**yarsync push** \[**-h**] \[**-f**] \[**-n**] \[**\--overwrite**] *destination*
+**yarsync push** \[**-h**] \[**-f**] \[**-n**] *destination*
 
 Sends data to a remote *destination*. See **pull** for more details and common options.
 
@@ -637,7 +626,7 @@ commits can be edited, with care taken to synchronize them correctly.
 They are not necessary, so removing any of them will not break the repository.
 If one wants to fix or improve a commit message though,
 they may edit the corresponding log
-(the change will be propagated during **push** with the **\--overwrite** option).
+(the change will be propagated during **push**).
 It is recommended to store logs even for old deleted commits,
 which may be present on formerly used devices.
 
