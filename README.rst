@@ -169,18 +169,19 @@ or online `manual <https://yarsync.readthedocs.io/en/latest/yarsync.1.html>`_.
 For more in-depth topics or alternatives, see
 `details <https://yarsync.readthedocs.io/en/latest/details.html>`_.
 
+On the repository github, `release notes <https://github.com/ynikitenko/yarsync/blob/master/NEWS.rst>`_ can be found.
 On github pages there is the manual for `yarsync 0.1 <https://ynikitenko.github.io/yarsync/man>`_.
 
 An article in Russian that deals more with ``yarsync`` internals was posted
 on `Habr <https://habr.com/ru/post/662163/>`_.
-
 
 ------
 Thanks
 ------
 
 A good number of people have contributed to the improvement of this software.
-I'd like to express my thanks to
+I'd like to thank
+Nilson Silva for packaging ``yarsync`` for Debian,
 Mikhail Zelenyy from MIPT NPM for the explanation of
 Python `entry points <https://npm.mipt.ru/youtrack/articles/GENERAL-A-87/>`_,
 Jason Ryan and Matthew T Hoare for the inspiration to create a package for Arch,
