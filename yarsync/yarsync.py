@@ -2227,7 +2227,7 @@ class YARsync():
             stdout = subprocess.DEVNULL
 
         # push synchronization information to the remote
-        if command_name == "push" and not new and not dry_run:
+        if command_name == "push" and not new and not dry_run and not force:
             # forbid --new sync update,
             # because it messes all sync together.
             # Obsolete local sync will be removed.
@@ -2360,7 +2360,7 @@ class YARsync():
                 )
 
         # update synchronization information locally
-        if command_name == "pull" and not new and not dry_run:
+        if command_name == "pull" and not new and not dry_run and not force:
             # we update "remote" sync, because it will be moved here
             # and we need to update it with the local information
             remote_sync.update(local_sync.by_repos.items())

@@ -1,6 +1,6 @@
-% YARSYNC(1) yarsync 0.1.1 | YARsync Manual
+% YARSYNC(1) yarsync 0.2 | YARsync Manual
 % Written by Yaroslav Nikitenko
-% June 2022
+% March 2023
 
 # YARsync manual
 
@@ -103,7 +103,7 @@ and are described in **pull** and **push** options.
 |--------------|-------------------------------------------------------------|
 |              |
 | **checkout** |    restore the working directory to a commit
-| **clone**    |    clone a repository into a new directory
+| **clone**    |    clone a repository
 | **commit**   |    commit the working directory
 | **diff**     |    print the difference between two commits
 | **init**     |    initialize a repository
@@ -169,9 +169,9 @@ or make a new one.
 
 ## clone
 
-**yarsync clone** \[**-h**] *name* *path|parent path*
+**yarsync clone** \[**-h**] *name* *path|parent-path*
 
-One can clone from within an existing repository **to** *parent path*
+One can clone from within an existing repository **to** *parent-path*
 or clone **from** a repository at *path*.
 In both cases a new directory with the repository is created,
 having the same name as the original repository folder.
@@ -183,8 +183,11 @@ Note that only data (working directory, commits, logs and synchronization inform
 not configuration files) will be cloned.
 This command will refuse to clone **from** a repository with a filter (see SPECIAL REPOSITORIES).
 
-*parent path* is useful when we want to clone several repositories into one directory.
+*parent-path* is useful when we want to clone several repositories into one directory.
 It allows us to use the same command for each of them (manually or with **mr**(1)).
+If one needs to have a different directory name for a repository,
+they can rename it manually
+(we don't require, but strongly encourage having same directory names for all replicas).
 
 #### Positional arguments
 
@@ -194,7 +197,7 @@ It allows us to use the same command for each of them (manually or with **mr**(1
 *path*
 : Path to the source repository (local or remote). Trailing slash is ignored.
 
-*parent path*
+*parent-path*
 : Path to the parent directory of the cloned repository (local or remote).
 Trailing slash is ignored.
 
@@ -206,6 +209,9 @@ See QUICK START for more details on commits.
 
 **\--limit**=*number*
 : Maximum number of commits.
+If the current number of commits exceeds that, older ones
+are removed during **commit**.
+See SPECIAL REPOSITORIES for more details.
 
 *message*
 : Commit message (used in logs). Can be empty.
@@ -232,7 +238,7 @@ Existing configuration and files in the working directory stay unchanged.
 Create a first commit for the repository to become fully operational.
 
 *reponame*
-: Name of the repository. If not given on the command line, it will be prompted.
+: Name of the repository. If not provided on the command line, it will be prompted.
 
 ## log
 
@@ -268,7 +274,8 @@ They synchronize the working directory,
 that is they add to the destination new files from source,
 remove those missing on source
 and do all renames and moves of previously committed files efficiently.
-This is done in one run, and these changes apply also to logs and commits.
+This is done in one run, and these changes apply also to
+logs, commits and synchronization.
 In most cases, we do not want our existing logs and commits to be removed though.
 By default, several checks are made to prevent data loss:
 
@@ -322,8 +329,8 @@ While this option can return deleted or moved files
 back to the working directory, it also adds remote logs and commits
 that were missing here (for example, old or unsynchronized commits).
 A forced **push** to the remote could remove
-these logs and commits, and this option allows one to **pull**
-them first to the local repository.
+these logs and commits, and this option allows one to first **pull**
+them to the local repository.
 
     After **pull \--new** the local repository can enter a merging state.
 See **pull** description for more details.
@@ -501,11 +508,13 @@ A repository can have a fixed maximum number of commits.
 **commit limit** can be set during **commit**.
 **pull** and **push** do not check for missing commits on the destination
 when we are in a repository with commit limit.
-It makes a repository with commit limit be more like a central repository.
+It makes a repository with commit limit more like a central repository.
 If we have reached the maximum number of commits,
 older ones are deleted during a new **commit**.
-Commit limit was introduced in ``yarsync v0.2``
-and designed to help against the problem of too many hard links (if it is present).
+Commit limit is stored in **.ys/COMMIT_LIMIT.txt**.
+It can be changed or removed at any time.
+Commit limit was introduced in ``yarsync v0.2`` and was designed to help
+against the problem of too many hard links (if it exists).
 
 ## FILES
 
@@ -514,8 +523,8 @@ in the hidden directory **.ys** under the root of the working directory.
 If the user no longer wants to use **yarsync** and the working directory
 is in the desired state, they can safely remove the **.ys** directory.
 
-Note that only commits and logs (apart from the working directory)
-are synchronized between the repositories.
+Apart from the working directory, only commits,
+logs and synchronization data are synchronized between the repositories.
 Each repository has its own configuration and name.
 
 ### User configuration files
@@ -526,7 +535,7 @@ This file can be edited directly or with **remote** commands
 according to user's preference.
 
     **yarsync** supports synchronization
-with only existing remotes.
+only with existing remotes.
 A simple configuration for a remote \"my\_remote\" could be:
 
         [my_remote]
@@ -572,24 +581,22 @@ Spaces around \'**=**\' are allowed.
 Full syntax specification can be found at
 <https://docs.python.org/3/library/configparser.html>.
 
-**.ys/repository.txt**
+**.ys/repo_\<name\>.txt**
 : Contains the repository name, which is used in logs
-and usually coincides with the remote name
+and usually should coincide with the remote name
 (how local repository is called on remotes).
-The name can be set during **init** or edited later.
+The name can be set during **init** or edited manually.
 
-    It is recommended (but not required) to have different names
-for the repository replicas on different hosts or devices.
+    Each repository replica must have a unique name.
 For example, if one has repositories \"programming/\" and \"music/\"
 on a laptop \"my\_host\", their names would probably be \"my\_host\",
 and the names of their copies on an external drive could be \"my\_drive\"
 (this is different from git, which uses only the author's name in logs).
-If one never creates commits directly on \"my\_drive\",
-these names can be empty.
 
-    If the repository name is missing (empty or no file), host name will be used.
-If there is an error getting the host name during **commit**,
-provide the name in the **repository.txt**.
+    Note that **clone** from inside a repository
+for technical reasons creates a temporary file with the new repository name
+(which is also written in **CLONE_TO_\<name\>.txt**).
+If these files due to some errors remain on the system, they can be safely removed.
 
 **.ys/rsync-filter**
 : Contains rsync filter rules, which effectively define what data belongs
@@ -608,7 +615,7 @@ to **rsync-filter**:
 
     In this way, \"~/work/tex\" and contained git repositories will be excluded
 from \"~/work\" synchronization. Lines starting with \'**#**\' are ignored,
-as well as empty lines. To complicate things, one can include a subdirectory
+as well as empty lines. To complicate things, one could include a subdirectory
 of \"tex\" into \"work\" with an include filter \'**+**\'.
 For complete details, see FILTER RULES section of **rsync**(1).
 
@@ -618,7 +625,7 @@ that need to be synchronized too. If the remote repository had
 its own filters, that would make synchronization even more unreliable.
 Therefore filters are generally discouraged: **pull** and **push** ignore
 remote filters (make sure you synchronize only *from* a repository with filters),
-while **clone** refuses to copy a repository with **rsync-filter**.
+while **clone** refuses to copy from a repository with **rsync-filter**.
 
 ### yarsync technical directories
 **.ys/commits/**
@@ -638,6 +645,22 @@ they may edit the corresponding log
 (the change will be propagated during **push**).
 It is recommended to store logs even for old deleted commits,
 which may be present on formerly used devices.
+
+**.ys/sync/**
+: Contains synchronization information for all known reposotories.
+This information is transferred between replicas during ``pull``, ``push`` and ``clone``,
+and it allows ``yarsync`` repositories to better support the 3-2-1 backup rule.
+The information is contained in empty files with names of the format **commit_repo.txt**.
+Pulling (or cloning) from a repository does not affect its files
+and does not update its synchronization information.
+**push** (and corresponding **clone**) updates synchronization for both replicas.
+For each repository only the most recent commit is stored.
+**sync** directory was introduced in ``yarsync v0.2``.
+See the release notes on how to convert old repositories to the new format
+or do it manually, if necessary.
+
+    If a replica has been permanently removed, its synchronization data
+must be removed manually and propagated with **\--force**.
 
 ## EXIT STATUS
 
@@ -695,7 +718,8 @@ To test that a particular file \"a\" was hard linked to its committed versions, 
 If all is correct, their inodes must be the same.
 
 Hard links may be broken in a cloned git repository
-(as it happens with **yarsync** tests), because git does not preserve them.
+(as it could happen with **yarsync** tests before),
+because git does not preserve them.
 To fix hard links for the whole repository, run **hardlink**(1) in its root.
 
 ## SEE ALSO
