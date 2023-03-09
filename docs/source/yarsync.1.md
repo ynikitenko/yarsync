@@ -2,17 +2,15 @@
 % Written by Yaroslav Nikitenko
 % March 2023
 
-# YARsync manual
-
-## NAME
+# NAME
 yarsync - a file synchronization and backup tool
 
-## SYNOPSIS
+# SYNOPSIS
 **yarsync** [**-h**] \[**\--config-dir** *DIR*\] \[**\--root-dir** *DIR*\] \[**-q** | **-v**\] *command* \[*args*\]
 
 [comment]: # (to see it converted to man, use pandoc yarsync.1.md -s -t man | /usr/bin/man -l -)
 
-## DESCRIPTION
+# DESCRIPTION
 Yet Another Rsync stores rsync configuration
 and synchronizes repositories with the interface similar to git.
 It is *efficient* (files in the repository can be removed
@@ -22,7 +20,7 @@ and in that case a manual merge is supported),
 *safe* (it takes care to prevent data loss and corruption)
 and *simple* (see this manual).
 
-## QUICK START
+# QUICK START
 
 To create a new repository, enter the directory with its files and type
 
@@ -87,7 +85,7 @@ we may actually change some files or find them corrupt.
 Solutions to these problems involve user decisions
 and are described in **pull** and **push** options.
 
-## OPTION SUMMARY
+# OPTION SUMMARY
 
 |                    |                                                       |
 |--------------------|-------------------------------------------------------|
@@ -97,7 +95,7 @@ and are described in **pull** and **push** options.
 | \--quiet, -q       |    decrease verbosity
 | \--verbose, -v     |    increase verbosity
 
-## COMMAND SUMMARY
+# COMMAND SUMMARY
 
 |              |                                                             |
 |--------------|-------------------------------------------------------------|
@@ -114,7 +112,7 @@ and are described in **pull** and **push** options.
 | **show**     |    print log messages and actual changes for commit(s)
 | **status**   |    print updates since last commit
 
-## OPTIONS
+# OPTIONS
 
 **\--help**, **-h**
 : Prints help message and exits.
@@ -138,7 +136,7 @@ If not set explicitly, the default working directory is the current one.
 : Increases verbosity. May print more rsync commands and output.
 Conflicts with **\--quiet**.
 
-## COMMANDS
+# COMMANDS
 
 All commands support the **\--help** option.
 Commands that can change a repository also support the **\--dry-run** option.
@@ -149,7 +147,7 @@ Commands that can change a repository also support the **\--dry-run** option.
 **\--help**, **-h**
 : Prints help for a command or a subcommand.
 
-## checkout
+# checkout
 
 **yarsync checkout** \[**-h**] \[**-n**] *commit*
 
@@ -167,7 +165,7 @@ or make a new one.
 *commit*
 : The commit name (as printed in **log** or during **commit**).
 
-## clone
+# clone
 
 **yarsync clone** \[**-h**] *name* *path|parent-path*
 
@@ -189,7 +187,7 @@ If one needs to have a different directory name for a repository,
 they can rename it manually
 (we don't require, but strongly encourage having same directory names for all replicas).
 
-#### Positional arguments
+### Positional arguments
 
 *name*
 : Name of the new repository.
@@ -201,7 +199,7 @@ they can rename it manually
 : Path to the parent directory of the cloned repository (local or remote).
 Trailing slash is ignored.
 
-## commit
+# commit
 **yarsync commit** \[**-h**] \[**-m** *message*] \[**--limit** *number*]
 
 Commits the working directory (makes its snapshot).
@@ -216,7 +214,7 @@ See SPECIAL REPOSITORIES for more details.
 *message*
 : Commit message (used in logs). Can be empty.
 
-## diff
+# diff
 
 **yarsync diff** \[**-h**] *commit* \[*commit*]
 
@@ -228,7 +226,7 @@ See **status** for the output format.
 *commit*
 : Commit name.
 
-## init
+# init
 
 **yarsync init** \[**-h**] \[*reponame*]
 
@@ -240,7 +238,7 @@ Create a first commit for the repository to become fully operational.
 *reponame*
 : Name of the repository. If not provided on the command line, it will be prompted.
 
-## log
+# log
 
 **yarsync log** [**-h**] \[**-n** *number*] \[**-r**]
 
@@ -248,7 +246,7 @@ Prints commit logs (from newest to oldest),
 as well as synchronization information when it is available.
 To see changes in the working directory, use **status**.
 
-#### Options
+### Options
 
 **\--max-count**=*number*, **-n**
 : Maximum number of logs shown.
@@ -256,13 +254,13 @@ To see changes in the working directory, use **status**.
 **\--reverse**, **-r**
 : Reverse log order.
 
-#### Example
+### Example
 
 To print information about the three most recent commits, use
 
     yarsync log -n 3
 
-## pull
+# pull
 
 **yarsync pull** \[**-h**] \[**-f** | **\--new** | **-b** | **\--backup-dir** *DIR*] [**-n**] *source*
 
@@ -321,7 +319,7 @@ After our working directory is in the desired state,
 we **commit** changes and the merge is finished.
 The result shall be pushed to the remote without problems.
 
-#### pull options
+### pull options
 
 **\--new**
 : Do not remove local data that is missing on *source*.
@@ -382,7 +380,7 @@ just save one of the files under a different name in the repository.
 
     After you have fixed all corrupt files, push them back to the remote.
 
-#### pull and push options
+### pull and push options
 
 **\--force**, **-f**
 : Updates the working directory, removing commits and logs missing on source.
@@ -396,13 +394,13 @@ Use it if the destination has really unneeded commits
 or just remove them manually (see FILES for details on the commit directory).
 See also **pull \--new** on how to fetch missing commits.
 
-## push
+# push
 
 **yarsync push** \[**-h**] \[**-f**] \[**-n**] *destination*
 
 Sends data to a remote *destination*. See **pull** for more details and common options.
 
-## remote
+# remote
 **yarsync remote** \[**-h**] \[**-v**] \[*command*]
 
 Manages remote repositories configuration.
@@ -412,7 +410,7 @@ For more options, see *.ys/config.ini* in the FILES section.
 **-v**
 : Verbose. Prints remote paths as well.
 
-#### **add**
+### **add**
 
 **yarsync remote add** \[**-h**] *repository* *path*
 
@@ -424,16 +422,16 @@ or it can be a local path. Since **yarsync** commands can be called
 from any subdirectory, local path should be absolute.
 Tilde for user's home directory \'**~**\' in paths is allowed.
 
-#### rm
+### rm
 
 **yarsync remote rm** \[**-h**\] *repository*
 
 Removes an existing *repository* from local configuration.
 
-#### show
+### show
 Prints remote repositories. Default.
 
-## show
+# show
 **yarsync show** \[**-h**] *commit* \[*commit* ...\]
 
 Prints log messages and actual changes for commit(s).
@@ -444,7 +442,7 @@ Information for several commits can be requested as well.
 *commit*
 : Commit name.
 
-## status
+# status
 
 **yarsync status** \[**-h**]
 
@@ -452,7 +450,7 @@ Prints working directory updates since the last commit and the repository status
 If there were no errors, this command always returns success
 (irrespective of uncommitted changes).
 
-#### Output format of the updates
+### Output format of the updates
 
 The output for the updates is a list of changes, including attribute changes,
 and is based on the format of *rsync \--itemize-changes*.
@@ -478,7 +476,7 @@ The attribute letters are: **c**hecksum, **s**ize, modification **t**ime,
 **a** stands for ACL, and **x** for extended attributes.
 Complete details on the output format can be found in the **rsync**(1) manual.
 
-## SPECIAL REPOSITORIES
+# SPECIAL REPOSITORIES
 
 A **detached** repository is one with the **yarsync** configuration directory
 outside the working directory.
@@ -516,7 +514,7 @@ It can be changed or removed at any time.
 Commit limit was introduced in ``yarsync v0.2`` and was designed to help
 against the problem of too many hard links (if it exists).
 
-## FILES
+# FILES
 
 All **yarsync** repository configuration and data is stored
 in the hidden directory **.ys** under the root of the working directory.
@@ -527,7 +525,7 @@ Apart from the working directory, only commits,
 logs and synchronization data are synchronized between the repositories.
 Each repository has its own configuration and name.
 
-### User configuration files
+## User configuration files
 
 **.ys/config.ini**
 : Contains names and paths of remote repositories.
@@ -627,7 +625,7 @@ Therefore filters are generally discouraged: **pull** and **push** ignore
 remote filters (make sure you synchronize only *from* a repository with filters),
 while **clone** refuses to copy from a repository with **rsync-filter**.
 
-### yarsync technical directories
+## yarsync technical directories
 **.ys/commits/**
 : Contains local commits (snapshots of the working directory).
 If some of the old commits are no longer needed (there are too many of them
@@ -662,7 +660,7 @@ or do it manually, if necessary.
     If a replica has been permanently removed, its synchronization data
 must be removed manually and propagated with **\--force**.
 
-## EXIT STATUS
+# EXIT STATUS
 
 **0**
 : Success
@@ -692,7 +690,7 @@ or add a remote with an already present name), the command error is returned.
 It is also possible that a general system error, such as a keyboard interrupt,
 is raised in the Python interpreter. See **rsync**(1) for rsync errors.
 
-## DIAGNOSTICS
+# DIAGNOSTICS
 
 To check that your clocks (used for properly ordering commits) at different hosts
 are synchronized well enough, run
@@ -722,12 +720,12 @@ Hard links may be broken in a cloned git repository
 because git does not preserve them.
 To fix hard links for the whole repository, run **hardlink**(1) in its root.
 
-## SEE ALSO
+# SEE ALSO
 **rsync**(1)
 
 The yarsync page is <https://github.com/ynikitenko/yarsync>.
 
-## BUGS
+# BUGS
 Requires a filesystem with hard links,
 rsync version at least 3.1.0 (released 28 September 2013) and Python >= 3.6.
 
@@ -736,7 +734,7 @@ Occasionally Python errors are raised instead of correct return codes.
 Please report any bugs or make feature requests to
 <https://github.com/ynikitenko/yarsync/issues>.
 
-## COPYRIGHT
+# COPYRIGHT
 Copyright © 2021-2023 Yaroslav Nikitenko.
 License GPLv3: GNU GPL version 3 <https://gnu.org/licenses/gpl.html>.\
 This is free software: you are free to change and redistribute it. There is NO
