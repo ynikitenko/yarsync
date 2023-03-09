@@ -502,8 +502,8 @@ This may be convenient, but makes synchronization less reliable,
 and such repository can not be used as a remote.
 See **rsync-filter** in the FILES section for more details.
 
-A repository can have a fixed maximum number of commits.
-**commit limit** can be set during **commit**.
+A repository can have a **commit limit**.
+The maximum number of commits can be set during **commit**.
 **pull** and **push** do not check for missing commits on the destination
 when we are in a repository with commit limit.
 It makes a repository with commit limit more like a central repository.
@@ -715,7 +715,7 @@ To test that a particular file \"a\" was hard linked to its committed versions, 
 
 If all is correct, their inodes must be the same.
 
-Hard links may be broken in a cloned git repository
+Hard links can be broken in a cloned git repository
 (as it could happen with **yarsync** tests before),
 because git does not preserve them.
 To fix hard links for the whole repository, run **hardlink**(1) in its root.

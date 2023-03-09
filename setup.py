@@ -16,7 +16,7 @@ setuptools.setup(
     long_description_content_type="text/x-rst",
     url="https://github.com/ynikitenko/yarsync",
     project_urls = {
-        'Documentation': 'https://ynikitenko.github.io/yarsync/',
+        'Documentation': 'https://yarsync.readthedocs.io',
         'Source': 'https://github.com/ynikitenko/yarsync',
         'Tracker': 'https://github.com/ynikitenko/yarsync/issues',
     },

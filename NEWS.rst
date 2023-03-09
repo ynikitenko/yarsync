@@ -81,7 +81,7 @@ Backward incompatible changes
 
 Technical changes
 -----------------
-Documentation has been moved to ReadTheDocs.
+Documentation has been moved to Read the Docs.
 
 * ``yarsync`` is tested for Python 3.11.
 
