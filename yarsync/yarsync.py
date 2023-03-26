@@ -20,6 +20,8 @@ import sys
 import time
 
 
+from .version import __version__
+
 ########################
 ### MODULE CONSTANTS ###
 ########################
@@ -469,6 +471,10 @@ class YARsync():
                                    default=0,
                                    help="increase verbosity")
 
+        # this is not an option, but more like a separate command
+        parser.add_argument("--version", "-V", action="store_true",
+                            help="print version")
+
         ############################
         ## Initialize subcommands ##
         ############################
@@ -695,6 +701,16 @@ class YARsync():
         )
         parser_status.set_defaults(func=self._status)
 
+        #####################
+        ## Parse arguments ##
+        #####################
+
+        # basename, because ipython may print full path
+        self.NAME = os.path.basename(argv[0])  # "yarsync"
+        # directory with commits and other metadata
+        # (may be updated by command line arguments)
+        self.YSDIR = ".ys"
+
         if len(argv) > 1:  # 0th argument is always present
             try:
                 args = parser.parse_args(argv[1:])
@@ -706,6 +722,10 @@ class YARsync():
                 if err.code == 0:
                     raise err
                 raise YSUnrecognizedArgumentsError(err.code)
+            else:
+                if args.version:
+                    self._print_version()
+                    sys.exit(0)
         else:
             # default is print help.
             # Will raise SystemExit(0).
@@ -715,11 +735,6 @@ class YARsync():
         ## Init configuration ##
         ########################
 
-        # basename, because ipython may print full path
-        self.NAME = os.path.basename(argv[0])  # "yarsync"
-        # directory with commits and other metadata
-        # (may be updated by command line arguments)
-        self.YSDIR = ".ys"
         _ysdir = self.YSDIR
 
         root_dir = os.path.expanduser(args.root_dir)
@@ -2043,6 +2058,10 @@ class YARsync():
         # hard to imagine a "quiet log", but still.
         self._print(commit_str, log_str, sep='\n', end='')
         # print(commit_str, log_str, sep='\n', end='')
+
+    def _print_version(self):
+        print(self.NAME, "version", __version__)
+        # todo: print rsync version and whether it supports hard links
 
     def _pull_push(
             self, command_name, remote,

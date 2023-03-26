@@ -167,3 +167,16 @@ def test_print_command(capfd):
     captured = capfd.readouterr()
     assert not captured.err
     assert captured.out == "this 'should be quoted'\n"
+
+
+def test_version(capfd):
+    from yarsync.yarsync import __version__
+
+    try:
+        YARsync(["yarsync", "--version"])
+    except SystemExit as err:
+        assert err.code == 0
+    captured = capfd.readouterr()
+
+    assert not captured.err
+    assert captured.out == "yarsync version " + __version__ + "\n"

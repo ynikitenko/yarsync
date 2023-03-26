@@ -5,9 +5,15 @@ with open("README.rst", "r") as readme:
     long_description = readme.read()
 
 
+# from https://packaging.python.org/en/latest/guides/single-sourcing-package-version/
+version = {}
+with open("yarsync/version.py") as fp:
+    exec(fp.read(), version)
+
+
 setuptools.setup(
     name="yarsync",
-    version="0.2",
+    version=version['__version__'],
     author="Yaroslav Nikitenko",
     author_email="metst13@gmail.com",
     description="Yet Another Rsync is a file synchronization and backup tool",
