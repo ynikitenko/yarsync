@@ -21,7 +21,7 @@ For an installation `from PyPI <https://pypi.org/project/yarsync/>`_, run
 
 .. code-block:: console
 
-    pip install yarsync
+    pip3 install yarsync
 
 Since there is no general way to install a manual page for a Python package,
 one has to do it manually. For example, run as a superuser:
@@ -44,7 +44,7 @@ but at the same time is less stable (new features can be changed or removed).
 .. code-block:: console
 
     git clone https://github.com/ynikitenko/yarsync.git
-    pip install -e yarsync
+    pip3 install -e yarsync
 
 This installs the ``yarsync`` executable to *~/.local/bin*,
 and does not require modifications of ``PYTHONPATH``.
@@ -54,7 +54,7 @@ To **uninstall**, run
 
 .. code-block:: console
 
-    pip uninstall yarsync
+    pip3 uninstall yarsync
 
 and remove the cloned repository.
 

@@ -6,6 +6,9 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+# for readthedocs, https://pennyhow.github.io/blog/making-readthedocs/
+# Otherwise yarsync module won't be found.
+sys.path.insert(0, os.path.abspath('../../'))
 from yarsync.version import __version__
 
 project = 'YARsync'
