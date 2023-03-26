@@ -71,8 +71,8 @@ def origin_test_dir(origin_dir=TEST_DIR, test_dir=TEST_DIR_YS_BAD_PERMISSIONS):
 def test_dir_read_only():
     os.chmod(TEST_DIR_READ_ONLY, 0o544)
     return TEST_DIR_READ_ONLY
-    # no need to tear down,
-    # since git has no problems with read-only directories
+    # tear down, because otherwise may have problems with cleaning up
+    os.chmod(TEST_DIR_READ_ONLY, 0o744)
 
 
 @pytest.fixture(scope="session")
@@ -82,4 +82,4 @@ def test_dir_ys_bad_permissions():
     # we tear down later, because otherwise pytest will have problems
     # with searching in that directory
     yield TEST_DIR_YS_BAD_PERMISSIONS
-    os.chmod(subdir_bad_perms, 0o544)
+    os.chmod(subdir_bad_perms, 0o744)
