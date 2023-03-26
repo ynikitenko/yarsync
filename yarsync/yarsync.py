@@ -938,7 +938,9 @@ class YARsync():
         elif args.command_name == "push":
             args._remote = args.destination
 
-        self.print_level = 2 - args.quiet + args.verbose
+        self._default_print_level = 2
+        self.print_level = (self._default_print_level
+                            - args.quiet + args.verbose)
 
         self._args = args
 
@@ -960,12 +962,12 @@ class YARsync():
         try:
             remote_config = self._get_remote_config(remote_config_path)
         except OSError:
-            _print_error("no yarsync repository found at {}".format(path))
+            _print_error("No yarsync repository found at {}".format(path))
             return COMMAND_ERROR
         except YSConfigurationError as err:
             # the error is not printed in main,
             # because here we can customize it better
-            _print_error("could not get remote configuration. " + err.msg)
+            _print_error("Could not get remote configuration. " + err.msg)
             return CONFIG_ERROR
         if "rsync-filter" in remote_config._file_list:
             _print_error(
@@ -979,7 +981,7 @@ class YARsync():
             # todo: it should be checked among all synced repos
             _print_error(
                 "Name '{}' is already used by the remote. ".format(name) +
-                "Each replica name must be unique. Aborting"
+                "Aborting.\n  Each replica name must be unique."
             )
             return COMMAND_ERROR
         self._remote_config = remote_config
@@ -990,8 +992,9 @@ class YARsync():
             os.mkdir(repo_dir_name)
         else:
             _print_error(
-                "directory {} exists, aborting"
-                .format(repo_dir_name)
+                "Directory '{}' exists. Aborting.\n  ".format(repo_dir_name) +
+                "Are you cloning from the parent directory of '{}'?"\
+                .format(orig_path)
             )
             return COMMAND_ERROR
         os.chdir(repo_dir_name)
@@ -1018,10 +1021,10 @@ class YARsync():
         #     ys._remote_rm(remote_name)
         #     return COMMAND_ERROR
         if returncode:
-            _print_error("an error occurred while pulling data from {}."
+            _print_error("An error occurred while pulling data from '{}'."
                          .format(remote_name))
         else:
-            self._print("\ncloned from {}.".format(remote_name))
+            self._print("\ncloned from '{}'.".format(remote_name))
 
         return returncode
 
@@ -1041,14 +1044,18 @@ class YARsync():
         path = os.path.join(parent_path, repo_dir_name)
         try:
             # parent_path must exist and be readable
-            remote_files = self._get_remote_files(eparent_path)
+            # print rsync errors only when verbose
+            rsync_pl = self._default_print_level + 2
+            remote_files = self._get_remote_files(
+                eparent_path, print_level=rsync_pl
+            )
         except OSError as err:
             # hypothetically, we need only write access,
             # but it would be safer to check
             # the existence of the new path
             _print_error(
-                "Parent folder of the repository could not be read "
-                "at {} . Aborting.".format(eparent_path)
+                "Parent folder of the clone could not be read. "
+                "Aborting.\n  Does the path '{}' exist?".format(eparent_path)
             )
             return COMMAND_ERROR
         if repo_dir_name in remote_files:
@@ -1081,7 +1088,8 @@ class YARsync():
         # temporarily create a repo file to transfer it
         remote_repo_file = self._write_repo_name(remote, verbose=False)
         clone_to_file = self.CLONETOFILE.format(remote)
-        self._print("# create a temporary file {}".format(clone_to_file))
+        self._print("# create a temporary file {}".format(clone_to_file),
+                    level=self._default_print_level)
         with open(clone_to_file, "x"):
             pass
 
@@ -1124,7 +1132,7 @@ class YARsync():
             remote_rm()
             return returncode
 
-        self._print("\ncloned to {}.".format(remote))
+        self._print("\ncloned to '{}'.".format(remote))
         return returncode
 
     def _checkout(self, commit=None):
@@ -1586,11 +1594,14 @@ class YARsync():
         # command = "rsync -nr --info=NAME --include=/ --exclude=/*/*".split() \
         #           + [from_path, to_path]
         self._print_command(" ".join(command), level=print_level)
-        if print_level:
+        if print_level <= self.print_level + 1:
+            # at print level 3 we print errors, but not the commands
             stderr = None  # all errors printed
         else:
-            stderr = subprocess.PIPE
+            stderr = subprocess.DEVNULL
         sp = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=stderr)
+        # todo: can we iterate stdout before wait is finished?
+        # It is not critical, because we list not the complete hierarchy
         sp.wait()
 
         returncode = sp.returncode
@@ -1739,18 +1750,20 @@ class YARsync():
             # new_config will be False
             new_config = True
         else:
-            self._print("{} already exists, skip".format(ysdir), level=2)
+            self._print("{} already exists, skip".format(ysdir),
+                        level=self._default_print_level)
             new_config = False
 
         # create self.CONFIGFILE
         if not os.path.exists(self.CONFIGFILE):
-            self._print("# create configuration file {}".format(self.CONFIGFILE))
+            self._print("# create configuration file {}".format(self.CONFIGFILE),
+                        level=self._default_print_level)
             with open(self.CONFIGFILE, "w") as fil:
                 print(CONFIG_EXAMPLE, end="", file=fil)
             new_config = True
         else:
             self._print("{} already exists, skip".format(self.CONFIGFILE),
-                        level=2)
+                        level=self._default_print_level)
 
         # create repofile
         cur_reponame = _get_repo_name_if_exists(config_dir=self.config_dir)
@@ -1771,7 +1784,8 @@ class YARsync():
                     .format(cur_reponame)
                 )
                 return COMMAND_ERROR
-            self._print("{} already exists, skip".format(cur_reponame), level=2)
+            self._print("{} already exists, skip".format(cur_reponame),
+                        level=self._default_print_level)
 
         # completely untested
         if merge:
@@ -1848,7 +1862,8 @@ class YARsync():
                 for str_ in filter_strs:
                     print(str_, file=fil)
             new_config = True
-            self._print("# Created configuration file {}".format(self.RSYNCFILTER))
+            self._print("# Created configuration file {}".format(self.RSYNCFILTER),
+                        level=self._default_print_level)
 
         ysdir_fp = os.path.realpath(ysdir)
         if new_config:
@@ -1994,13 +2009,14 @@ class YARsync():
     def _print(self, *args, level=None, **kwargs):
         """Print output messages."""
 
-        # in other print functions we use default level as None
         if level is None:
-            level = 1
+            # when we don't supply a print level,
+            # these calls are usually important
+            level = self._default_print_level - 1
 
         if level > self.print_level:
             return
-        if level >= 2:
+        if level > self._default_print_level:
             print("# ", end='')
         print(*args, **kwargs)
 
@@ -2182,23 +2198,21 @@ class YARsync():
 
         # get remote configuration. Note the trailing slash
         remote_config_dir = os.path.join(full_destpath, ".ys/")
-        try:
-            remote_config = self._get_remote_config(
-                remote_config_dir,
-                # don't complain about errors
-                print_level=0
-            )
-        except OSError:
-            if clone and command_name == "push":
-                # we could clone into an empty folder,
-                # use an empty config for technical simplicity
-                remote_config = _Config({}, allow_empty=True)
-            else:
+        if clone and command_name == "push":
+            remote_config = _Config({}, allow_empty=True)
+        else:
+            try:
+                remote_config = self._get_remote_config(
+                    remote_config_dir,
+                    # don't complain about errors
+                    print_level=self._default_print_level+2
+                )
+            except OSError:
                 _print_error("remote contains no yarsync repository")
                 return CONFIG_ERROR
-        except YSConfigurationError as err:
-            _print_error("could not read remote configuration. " + err.msg)
-            return CONFIG_ERROR
+            except YSConfigurationError as err:
+                _print_error("could not read remote configuration. " + err.msg)
+                return CONFIG_ERROR
         remote_commits = remote_config.commits
         remote_sync = remote_config.sync
 
@@ -2233,8 +2247,8 @@ class YARsync():
                 "2) push if these commits were successfully merged, or\n"
                 "2') optionally checkout,\n"
                 "3') manually update the working directory "
-                "to the desired state, commit and push,\n"
-                "2'') --force local state to remote "
+                "to the desired state, commit and push, or\n"
+                "1') pull/push --force the desired state "
                 "(removing all commits and logs missing on the destination)."
             )
 
@@ -2328,7 +2342,7 @@ class YARsync():
         if not_all_commits_exist:
             if not local_commits:
                 self._print("local commits missing")
-            if not remote_commits:
+            if not remote_commits and not clone:
                 self._print("remote commits missing")
             if new:
                 self._print("run {} without --new to fully synchronize "
@@ -2499,7 +2513,7 @@ class YARsync():
             config.set(remote, "options", options)
         with open(self.CONFIGFILE, "w") as configfile:
             config.write(configfile)
-        self._print("Remote {} added.".format(remote))
+        self._print("Remote '{}' added.".format(remote))
         return 0
 
     def _remote_rm(self, remote):
@@ -2759,19 +2773,22 @@ class YARsync():
         # return full path to the repository file
         return repofile
 
-    def _write_sync(self, sync, verbose=True):
-        if verbose and (sync.new or sync.removed):
-            self._print("update synchronization:")
+    def _write_sync(self, sync, print_level=3):
+        if sync.new or sync.removed:
+            self._print("updating synchronization ... ", end='',
+                        level=print_level-1)
+        if print_level <= self.print_level and (sync.removed or sync.new):
+            print()
         for sync_str in sync.removed:
-            if verbose:
-                self._print("  remove", sync_str)
+            self._print("  remove", sync_str, level=print_level)
             os.remove(os.path.join(self.SYNCDIR, sync_str))
         if sync.new and not os.path.exists(self.SYNCDIR):
-            self._print_command("mkdir {}".format(self.SYNCDIR))
+            if print_level <= self.print_level:
+                print()
+            self._print_command("mkdir {}".format(self.SYNCDIR), level=print_level-1)
             os.mkdir(self.SYNCDIR)
         for sync_str in sync.new:
-            if verbose:
-                self._print("  create", sync_str)
+            self._print("  create", sync_str, level=print_level)
             with open(os.path.join(self.SYNCDIR, sync_str), "x"):
                 # just create this file
                 pass
@@ -2780,6 +2797,7 @@ class YARsync():
         # (then we remove the wrong repo from sync)
         sync.new = set()
         sync.removed = set()
+        self._print("done", level=print_level-1)
 
     def __call__(self):
         """Call the command set during the initialisation."""

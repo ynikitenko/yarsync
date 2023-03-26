@@ -107,7 +107,7 @@ def test_clone_errors(tmp_path_factory, capfd, test_dir_ys_bad_permissions):
     return_code = ys1._clone_from("origin", str(invalid_source))
     assert return_code == COMMAND_ERROR
     err = capfd.readouterr().err
-    assert 'no yarsync repository found at ' in err
+    assert 'No yarsync repository found at ' in err
 
     ## Can't clone into a repository with the same name
     os.chdir(dest1)
@@ -121,7 +121,7 @@ def test_clone_errors(tmp_path_factory, capfd, test_dir_ys_bad_permissions):
     ys_exists = YARsync(clone_command + ["new_TEST", TEST_DIR])
     returncode = ys_exists()
     assert returncode == COMMAND_ERROR
-    assert "directory test_dir exists, aborting" in capfd.readouterr().err
+    assert "Directory 'test_dir' exists. Aborting" in capfd.readouterr().err
 
     ## Can't clone from inside a repository with bad permissions
     bad_perm_source = str(tmp_path_factory.mktemp("bad_perm"))
@@ -147,7 +147,7 @@ def test_clone_errors(tmp_path_factory, capfd, test_dir_ys_bad_permissions):
     rsync_return = 23
     assert ys3() == rsync_return
     captured = capfd.readouterr()
-    assert "an error occurred while pulling data from" in captured.err
+    assert "An error occurred while pulling data from" in captured.err
 
     ## Can't clone from here if we can't read the remote parent
     os.chdir(test_dir)
@@ -164,7 +164,7 @@ def test_clone_errors(tmp_path_factory, capfd, test_dir_ys_bad_permissions):
     # check errors
     assert returncode == COMMAND_ERROR
     captured = capfd.readouterr()
-    assert "Parent folder of the repository could not be read " in captured.err
+    assert "Parent folder of the clone could not be read. Aborting" in captured.err
 
     ## Clone name must not exist in remotes
     os.chdir(test_dir)
