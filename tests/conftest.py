@@ -5,7 +5,6 @@ import pytest
 
 from yarsync import YARsync
 from .settings import TEST_DIR, TEST_DIR_READ_ONLY, TEST_DIR_YS_BAD_PERMISSIONS
-# TEST_DIR = "test_dir"
 
 collect_ignore_glob = ["test_dir_*"]
 
@@ -40,12 +39,17 @@ def fix_ys_hardlinks(test_dir):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def test_dir():
+def fix_test_dir():
     test_dir = TEST_DIR
     fix_ys_hardlinks(test_dir)
     # this fixture must be always used with the TEST_DIR,
     # but we allow it to be used in test arguments for explicitness
     return test_dir
+
+
+@pytest.fixture
+def test_dir():
+    os.chdir(TEST_DIR)
 
 
 @pytest.fixture(scope="session")
@@ -72,7 +76,7 @@ def test_dir_read_only():
     os.chmod(TEST_DIR_READ_ONLY, 0o544)
     return TEST_DIR_READ_ONLY
     # tear down, because otherwise may have problems with cleaning up
-    os.chmod(TEST_DIR_READ_ONLY, 0o744)
+    os.chmod(TEST_DIR_READ_ONLY, 0o755)
 
 
 @pytest.fixture(scope="session")
@@ -82,4 +86,4 @@ def test_dir_ys_bad_permissions():
     # we tear down later, because otherwise pytest will have problems
     # with searching in that directory
     yield TEST_DIR_YS_BAD_PERMISSIONS
-    os.chmod(subdir_bad_perms, 0o744)
+    os.chmod(subdir_bad_perms, 0o755)

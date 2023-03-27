@@ -40,15 +40,15 @@ def test_pull_push_uncommitted(
 
 
 @pytest.mark.parametrize("backup_dir", [True, False])
-def test_backup(tmp_path_factory, backup_dir, test_dir):
+def test_backup(tmp_path_factory, backup_dir):
     local_path = tmp_path_factory.mktemp("local")
     source_path = tmp_path_factory.mktemp("repo")
     local = local_path.__str__()
     source = source_path.__str__()
 
-    ## clone test_dir -> source -> local
+    ## clone TEST_DIR -> source -> local
 
-    clone_repo(test_dir, source)
+    clone_repo(TEST_DIR, source)
     # strange, why we first enter source, then local...
     # Better call them different names then.
     os.chdir(source)
