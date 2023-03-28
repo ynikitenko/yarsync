@@ -3,10 +3,10 @@ import pathlib
 import pytest
 import subprocess
 
-from yarsync import YARsync
+from yarsync.yarsync import YARsync, COMMAND_ERROR
 from .helpers import clone_repo
 from .settings import (
-    TEST_DIR, TEST_DIR_EMPTY, YSDIR, TEST_DIR_YS_BAD_PERMISSIONS
+    TEST_DIR, TEST_DIR_EMPTY, YSDIR, TEST_DIR_YS_BAD_PERMISSIONS,
 )
 
 
@@ -15,11 +15,11 @@ from .settings import (
 @pytest.mark.parametrize("pull", [True, False])
 @pytest.mark.parametrize("dry_run", [True, False])
 def test_pull_push_uncommitted(
-        capfd, origin_test_dir, test_dir_ys_bad_permissions,
+        capfd, origin_test_dir,
         pull, dry_run,
     ):
     """Pull and push always fail when there are uncommitted changes."""
-    os.chdir(test_dir_ys_bad_permissions)
+    os.chdir(TEST_DIR_YS_BAD_PERMISSIONS)
     command = ["yarsync"]
     if pull:
         command.append("pull")
@@ -30,13 +30,10 @@ def test_pull_push_uncommitted(
     ys = YARsync(command + ["origin"])
     # remote "origin" is added in origin_test_dir.
     returncode = ys()
-    # todo: should it be really 8?..
-    assert returncode == 8
+    assert returncode == COMMAND_ERROR
     captured = capfd.readouterr()
     assert "local repository has uncommitted changes" in captured.err
     assert "Changed since head commit:\n" in captured.out
-    # we allow printing changes.
-    # assert not captured.out
 
 
 @pytest.mark.parametrize("backup_dir", [True, False])

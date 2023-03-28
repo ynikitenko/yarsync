@@ -7,8 +7,9 @@ import time
 from yarsync import YARsync
 from yarsync.yarsync import _Sync
 from .settings import (
-    TEST_DIR, TEST_DIR_EMPTY, YSDIR, TEST_DIR_YS_BAD_PERMISSIONS,
-    TEST_DIR_CONFIG_DIR, TEST_DIR_WORK_DIR, TEST_DIR_FILTER
+    TEST_DIR, TEST_DIR_EMPTY, YSDIR,
+    TEST_DIR_CONFIG_DIR, TEST_DIR_WORK_DIR, TEST_DIR_FILTER,
+    TEST_DIR_YS_BAD_PERMISSIONS,
 )
 
 
@@ -48,8 +49,8 @@ def test_status_error(mocker, test_dir_read_only):
     # ]
 
 
-def test_status_error_bad_permissions(capfd, test_dir_ys_bad_permissions):
-    os.chdir(test_dir_ys_bad_permissions)
+def test_status_error_bad_permissions(capfd):
+    os.chdir(TEST_DIR_YS_BAD_PERMISSIONS)
     ys = YARsync(["yarsync", "status"])
     returncode = ys()
     # rsync returns 23 in case of permission errors
