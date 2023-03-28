@@ -103,7 +103,8 @@ simple
 safe
   ``yarsync`` does its best to preserve user data.
   It always allows one to see what will be done before any actual modifications
-  (*--dry-run*).
+  (*--dry-run*). It is its advantage compared to continous synchronization tools,
+  that may be dangerous if local repository gets corrupt (e.g. encrypted by a trojan).
   Removed files are stored in older commits
   (until the user explicitly removes those).
 
@@ -135,7 +136,7 @@ See ``yarsync --help`` for full command descriptions and options.
 ----------------------------
 Requirements and limitations
 ----------------------------
-``yarsync`` is a ``Python`` wrapper around ``rsync``
+``yarsync`` is a Python wrapper (available for ``Python>=3.6``) around ``rsync``
 and requires a file system with **hard links**.
 Since these are very common tools,
 this means that it can easily run on any UNIX-like system.

@@ -163,6 +163,11 @@ T{
 T}@T{
 increase verbosity
 T}
+T{
+--version, -V
+T}@T{
+print version
+T}
 .TE
 .SH COMMAND SUMMARY
 .PP
@@ -255,6 +260,11 @@ Does not affect error messages (redirect them if needed).
 Increases verbosity.
 May print more rsync commands and output.
 Conflicts with \f[B]--quiet\f[R].
+.TP
+\f[B]--version\f[R], \f[B]-V\f[R]
+Prints the \f[B]yarsync\f[R] version and exits.
+If \f[B]--help\f[R] is given, it takes precedence over
+\f[B]--version\f[R].
 .SH COMMANDS
 .PP
 All commands support the \f[B]--help\f[R] option.

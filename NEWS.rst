@@ -1,3 +1,13 @@
+===========================
+YARsync 0.2.1
+===========================
+YARsync patch release 0.2.1 was done on 28 March 2023.
+
+* Adds ``--version`` command.
+* Improves diagnostic messages.
+* Improves documentation.
+* Fixes tests.
+
 ===============
   YARsync 0.2
 ===============

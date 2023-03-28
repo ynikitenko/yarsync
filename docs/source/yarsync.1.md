@@ -94,6 +94,7 @@ and are described in **pull** and **push** options.
 | \--root-dir=DIR    |    path to the root of the working directory
 | \--quiet, -q       |    decrease verbosity
 | \--verbose, -v     |    increase verbosity
+| \--version, -V     |    print version
 
 # COMMAND SUMMARY
 
@@ -135,6 +136,10 @@ If not set explicitly, the default working directory is the current one.
 **\--verbose**, **-v**
 : Increases verbosity. May print more rsync commands and output.
 Conflicts with **\--quiet**.
+
+**\--version**, **-V**
+: Prints the **yarsync** version and exits.
+If **\--help** is given, it takes precedence over **\--version**.
 
 # COMMANDS
 
