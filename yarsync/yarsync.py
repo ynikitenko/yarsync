@@ -513,6 +513,10 @@ class YARsync():
             help="path to the origin (from) "
                  "or to the parent directory of the clone (to)"
         )
+        parser_clone.add_argument(
+            "-f", "--force", action="store_true",
+            help="ignore remote rsync-filter (only for pull)"
+        )
 
         # commit #
         parser_commit = subparsers.add_parser(
@@ -885,6 +889,10 @@ class YARsync():
         elif args.command_name == "clone":
             if root_dir:
                 # cloning to
+                if args.force:
+                    err_msg = "yarsync: error: --force can be used only when cloning from"
+                    print(err_msg)
+                    raise YSArgumentError("force", err_msg)
                 self._func = functools.partial(
                     self._clone_to,
                     remote=args.name, parent_path=args.path
@@ -893,7 +901,7 @@ class YARsync():
                 # cloning from
                 self._func = functools.partial(
                     self._clone_from,
-                    name=args.name, path=args.path
+                    name=args.name, path=args.path, force=args.force
                 )
         elif args.command_name == "init":
             # https://stackoverflow.com/a/41070441/952234
@@ -944,7 +952,7 @@ class YARsync():
 
         self._args = args
 
-    def _clone_from(self, name, path):
+    def _clone_from(self, name, path, force):
         """Clone the repository from *path*.
 
         The new repository will be called *name* and
@@ -969,7 +977,7 @@ class YARsync():
             # because here we can customize it better
             _print_error("Could not get remote configuration. " + err.msg)
             return CONFIG_ERROR
-        if "rsync-filter" in remote_config._file_list:
+        if not force and "rsync-filter" in remote_config._file_list:
             _print_error(
                 "Remote configuration contains rsync-filter.\n  "
                 "Initialize a new repository and copy the filter manually,\n  "
