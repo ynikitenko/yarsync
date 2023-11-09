@@ -952,7 +952,7 @@ class YARsync():
 
         self._args = args
 
-    def _clone_from(self, name, path, force):
+    def _clone_from(self, name, path, force=False):
         """Clone the repository from *path*.
 
         The new repository will be called *name* and
@@ -2050,7 +2050,7 @@ class YARsync():
             # list
             self._print(" ".join(command_str(command)), level=level)
 
-    def _print_log(self, commit, log, local_repo, sync=None, head_commit=None):
+    def _print_log(self, commit, log, local_repo, sync, head_commit=None):
         if commit is None:
             commit_str = "commit {} is missing".format(log)
             commit = log
@@ -2572,13 +2572,18 @@ class YARsync():
         # commit logs can be None
         commits_with_logs = self._make_commit_list(commits=commits)
         sync = self._get_local_sync(verbose=True)
+        try:
+            local_repo = self._get_repo_name_local()
+        except YSConfigurationError:
+            return CONFIG_ERROR
 
         for ind, cl in enumerate(commits_with_logs):
             commit, log = cl
             # print log
             if ind:
                 print()
-            self._print_log(commit, log, sync)
+            self._print_log(commit=commit, log=log,
+                            local_repo=local_repo, sync=sync)
             # print commit
             commit_ind = all_commits.index(commit)
             if not commit_ind:
