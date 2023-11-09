@@ -23,6 +23,15 @@ For an installation `from PyPI <https://pypi.org/project/yarsync/>`_, run
 
     pip3 install yarsync
 
+For macOS ventura installation, the built-in rsync in macOS is version 2.6.9, yarsync requires a new version of rsync, run
+
+.. code-block:: console
+
+    brew install rsync
+    pip3 install yarsync
+
+If ``rsync: --outbuf=L: unknown option`` occurs, make sure that a new version of rsync has been installed.
+
 Since there is no general way to install a manual page for a Python package,
 one has to do it manually. For example, run as a superuser:
 
