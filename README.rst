@@ -23,6 +23,14 @@ For an installation `from PyPI <https://pypi.org/project/yarsync/>`_, run
 
     pip3 install yarsync
 
+If you don't want to have it installed system widely (e.g. for testing), you can also install ``yarsync`` in a venv
+
+.. code-block:: console
+
+    python3 -m venv ~/.venv/yarsync
+    source ~/.venv/yarsync/bin/activate
+    pip install yarsync
+
 For macOS ventura installation, the built-in rsync in macOS is version 2.6.9, yarsync requires a new version of rsync, run
 
 .. code-block:: console
