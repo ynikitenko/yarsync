@@ -1,8 +1,6 @@
 # Mock OS functions and check that they are called properly
 
 import os
-import subprocess
-import sys
 
 from sys import version_info
 

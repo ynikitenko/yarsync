@@ -1,12 +1,10 @@
 import os
-import pathlib
 import pytest
-import subprocess
 
 from yarsync.yarsync import YARsync, COMMAND_ERROR
 from .helpers import clone_repo
 from .settings import (
-    TEST_DIR, TEST_DIR_EMPTY, YSDIR, TEST_DIR_YS_BAD_PERMISSIONS,
+    TEST_DIR, TEST_DIR_YS_BAD_PERMISSIONS,
 )
 
 

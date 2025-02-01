@@ -1,8 +1,6 @@
 import os
 
-from yarsync import YARsync
 from yarsync.yarsync import _substitute_env
-from .settings import TEST_DIR
 
 
 def test_env_vars():

@@ -1,14 +1,12 @@
 import os
 import pytest
-import subprocess
-import sys
 import time
 
 from sys import version_info
 
 from yarsync import YARsync
 
-from .settings import TEST_DIR, TEST_DIR_EMPTY, YSDIR
+from .settings import TEST_DIR_EMPTY, YSDIR
 
 
 def test_commit(mocker):
