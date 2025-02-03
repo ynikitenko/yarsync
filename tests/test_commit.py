@@ -4,6 +4,8 @@ import subprocess
 import sys
 import time
 
+from sys import version_info
+
 from yarsync import YARsync
 
 from .settings import TEST_DIR, TEST_DIR_EMPTY, YSDIR
@@ -93,20 +95,36 @@ def test_commit(mocker):
     # else:
     #     time_str = "Thu, 01 Jan 1970 03:00:03 MSK"
     time_str = time.strftime(ys.DATEFMT, time.localtime(3))
-
-    assert m.mock_calls == [
-        # call(ys.REPOFILE),
-        # call().__enter__(),
-        # call().read(),
-        # call().__exit__(None, None, None),
-        # call(commit_log_path, "w"),
-        call().__enter__(),
-        call().write(commit_msg + "\n\n"
-                     "When: {}\n".format(time_str) +
-                     "Where: user@myhost"),
-        call().write('\n'),
-        call().__exit__(None, None, None),
-    ]
+    
+    if version_info.minor >= 13:
+        assert m.mock_calls == [
+            # call(ys.REPOFILE),
+            # call().__enter__(),
+            # call().read(),
+            # call().__exit__(None, None, None),
+            # call(commit_log_path, "w"),
+            call().__enter__(),
+            call().write(commit_msg + "\n\n"
+                         "When: {}\n".format(time_str) +
+                         "Where: user@myhost"),
+            call().write('\n'),
+            call().__exit__(None, None, None),
+            call().close(),
+        ]
+    else:
+        assert m.mock_calls == [
+            # call(ys.REPOFILE),
+            # call().__enter__(),
+            # call().read(),
+            # call().__exit__(None, None, None),
+            # call(commit_log_path, "w"),
+            call().__enter__(),
+            call().write(commit_msg + "\n\n"
+                         "When: {}\n".format(time_str) +
+                         "Where: user@myhost"),
+            call().write('\n'),
+            call().__exit__(None, None, None),
+        ]
 
 
 @pytest.mark.parametrize("commit_time", [4, 0])
