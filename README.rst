@@ -193,6 +193,41 @@ On github pages there is the manual for `yarsync 0.1 <https://ynikitenko.github.
 An article in Russian that deals more with ``yarsync`` internals was posted
 on `Habr <https://habr.com/ru/post/662163/>`_.
 
+---------------------------------
+Development / Contributing notes
+---------------------------------
+
+Please use a virtualenv in order to avoid messing with your system while working on ``yarsync``.
+
+.. code-block:: console
+
+    python3 -m venv ~/.venv/yarsync_dev
+    source ~/.venv/yarsync_dev/bin/activate
+    pip install -r requirements.txt
+
+To build and then install ``yarsync``, run the following commands.
+
+.. code-block:: console
+
+    pip install --upgrade build
+    python -m build
+    pip install ./dist/yarsync-0.2.1.tar.gz
+
+Please make sure to run the tests and ensure you haven't broken anything before submitting a pull request.
+
+.. code-block:: console
+
+    pytest
+    # For a better verbose level
+    pytest -vvv
+
+You can run tests on all supported python versions by simply running in your venv ``tox``.
+Please make sure to have installed some supported python versions beforehand (At least two for tox to be useful).
+
+.. code-block:: console
+
+    tox
+
 ------
 Thanks
 ------
