@@ -1,12 +1,9 @@
 import os
-import stat
 
 import pytest
 
 from yarsync import YARsync
-from yarsync.yarsync import _is_commit, _substitute_env
 from yarsync.yarsync import (
-    CONFIG_EXAMPLE, YSConfigurationError, YSCommandError,
     CONFIG_ERROR, COMMAND_ERROR
 )
 

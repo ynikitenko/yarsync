@@ -1,14 +1,10 @@
 import os
 import pytest
-import subprocess
-import sys
-import time
 
 from yarsync import YARsync
 from yarsync.yarsync import _Sync
 from .settings import (
-    TEST_DIR, TEST_DIR_EMPTY, YSDIR,
-    TEST_DIR_CONFIG_DIR, TEST_DIR_WORK_DIR, TEST_DIR_FILTER,
+    TEST_DIR, TEST_DIR_EMPTY, TEST_DIR_CONFIG_DIR, TEST_DIR_WORK_DIR, TEST_DIR_FILTER,
     TEST_DIR_YS_BAD_PERMISSIONS,
 )
 

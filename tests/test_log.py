@@ -1,6 +1,5 @@
 import os
 import pytest
-import sys
 import time
 
 from yarsync import YARsync

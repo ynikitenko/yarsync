@@ -1,13 +1,12 @@
 """Test various small yarsync commands and configuration."""
 import os
-import socket
 
 import pytest
 
 from yarsync import YARsync
 from yarsync.yarsync import _is_commit, _substitute_env
 from yarsync.yarsync import (
-    CONFIG_EXAMPLE, YSConfigurationError, YSCommandError
+    CONFIG_EXAMPLE, YSConfigurationError
 )
 
 from .settings import TEST_DIR

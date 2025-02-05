@@ -1,7 +1,5 @@
-import os
 import pytest
 
-from yarsync import YARsync
 from yarsync.yarsync import _Sync as Sync, YSConfigurationError
 
 

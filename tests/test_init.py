@@ -1,8 +1,8 @@
 # Mock OS functions and check that they are called properly
 
 import os
-import subprocess
-import sys
+
+from sys import version_info
 
 from yarsync import YARsync
 from yarsync.yarsync import CONFIG_EXAMPLE
@@ -41,13 +41,23 @@ def test_init_mixed(mocker):
     assert res == 0
 
     call = mocker.call
-    assert m.mock_calls == [
-        # call(conffile, "w"), call().__enter__(),
-        # call().write(CONFIG_EXAMPLE), call().write(''),
-        # call().__exit__(None, None, None),
-        call(repofile, "x"), call().__enter__(),
-        call().__exit__(None, None, None)
-    ]
+    if version_info.minor >= 13:
+        assert m.mock_calls == [
+            # call(conffile, "w"), call().__enter__(),
+            # call().write(CONFIG_EXAMPLE), call().write(''),
+            # call().__exit__(None, None, None),
+            call(repofile, "x"), call().__enter__(),
+            call().__exit__(None, None, None),
+            call().close()
+        ]
+    else:
+        assert m.mock_calls == [
+            # call(conffile, "w"), call().__enter__(),
+            # call().write(CONFIG_EXAMPLE), call().write(''),
+            # call().__exit__(None, None, None),
+            call(repofile, "x"), call().__enter__(),
+            call().__exit__(None, None, None)
+        ]
     # old_calls = m.mock_calls[:]
 
     # clear the calls
@@ -84,14 +94,27 @@ def test_init_non_existent(mocker):
     call = mocker.call
     assert mkdir.mock_calls == [call(YSDIR)]
     # assert mkdir.mock_calls == [call(YSDIR, ys.DIRMODE)]
-    assert m.mock_calls == [
-        # mkdir is recorded separately
-        call(conffile, "w"), call().__enter__(),
-        call().write(CONFIG_EXAMPLE), call().write(''),
-        call().__exit__(None, None, None),
-        call(repofile, "x"), call().__enter__(),
-        call().__exit__(None, None, None)
-    ]
+
+    if version_info.minor >= 13:
+        assert m.mock_calls == [
+            # mkdir is recorded separately
+            call(conffile, "w"), call().__enter__(),
+            call().write(CONFIG_EXAMPLE), call().write(''),
+            call().__exit__(None, None, None),
+            call().close(),
+            call(repofile, "x"), call().__enter__(),
+            call().__exit__(None, None, None),
+            call().close(),
+        ]
+    else:
+        assert m.mock_calls == [
+            # mkdir is recorded separately
+            call(conffile, "w"), call().__enter__(),
+            call().write(CONFIG_EXAMPLE), call().write(''),
+            call().__exit__(None, None, None),
+            call(repofile, "x"), call().__enter__(),
+            call().__exit__(None, None, None)
+        ]
 
 
 def test_init_existent(mocker):

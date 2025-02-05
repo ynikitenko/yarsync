@@ -1,10 +1,8 @@
-import os
 import pytest
-import subprocess
 
 from yarsync.yarsync import YARsync
 from yarsync.yarsync import (
-    COMMAND_ERROR, CONFIG_ERROR, SYS_EXIT_ERROR
+    COMMAND_ERROR
 )
 
 

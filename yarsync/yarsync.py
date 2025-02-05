@@ -1,14 +1,11 @@
 # Yet Another Rsync is a file synchronization tool
 
 import argparse
-import collections
 import configparser
-import datetime
 import functools
 # for user name
 import getpass
 import io
-import json
 import os
 import re
 # rmtree
@@ -1057,7 +1054,7 @@ class YARsync():
             remote_files = self._get_remote_files(
                 eparent_path, print_level=rsync_pl
             )
-        except OSError as err:
+        except OSError:
             # hypothetically, we need only write access,
             # but it would be safer to check
             # the existence of the new path
@@ -2835,7 +2832,7 @@ def main():
     try:
         ys = YARsync(sys.argv)
     except (argparse.ArgumentError, argparse.ArgumentTypeError,
-            YSArgumentError, YSUnrecognizedArgumentsError) as err:
+            YSArgumentError, YSUnrecognizedArgumentsError):
         ## Argparse error ##
         # rsync returns 1 in case of syntax or usage error,
         # therefore we use the same code
