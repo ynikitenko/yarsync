@@ -230,6 +230,42 @@ Make sure to have installed some supported Python versions beforehand (at least 
 
 After all tests you can remove the created directories or leave them for future tests.
 
+Tools you may like to use
+=========================
+
+A linter, like `pylint <https://github.com/pylint-dev/pylint>`_ or `ruff <https://docs.astral.sh/ruff/>`_, can improve the quality of your code.
+
+A dependency manager (like `uv <https://docs.astral.sh/uv/>`_) permits one to easily code in several Python versions and manage virtual environments.
+
+These are the most basic commands associated with uv.
+
+``uv tool install tox --with tox-uv``
+
+``uv tool install ruff``
+
+``uv python install 3.13``
+
+``uv python pin 3.13``
+
+``uv sync``
+
+``uv run -- yarsync``
+
+You can also directly enter a venv with
+
+``uv venv``
+
+``uv`` can be really useful when combined with `tox` because it will automatically create the required virtualenvs, install the required version, and install for each versions its dependencies before running the tests for all python versions.
+
+.. code-block:: console
+
+    # first, make sure you have uv installed.
+    # you then need to install tox with the tox-uv plugin.
+    uv tool install tox --with tox-uv
+    # You will maybe need to enable tox-uv in the pyproject.toml file.
+    # Finally, you can just run tox and it will do the rest.
+    tox
+
 ------
 Thanks
 ------
