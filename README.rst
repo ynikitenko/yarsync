@@ -197,7 +197,7 @@ on `Habr <https://habr.com/ru/post/662163/>`_.
 Development / Contributing notes
 ---------------------------------
 
-Please use a virtualenv in order to avoid messing with your system while working on ``yarsync``.
+You can use a virtual environment in order to avoid messing with your system while working on ``yarsync``:
 
 .. code-block:: console
 
@@ -205,13 +205,11 @@ Please use a virtualenv in order to avoid messing with your system while working
     source ~/.venv/yarsync_dev/bin/activate
     pip install -r requirements.txt
 
-To build and then install ``yarsync``, run the following commands.
+To build and then install ``yarsync``, run the next command while being in the root of the repository:
 
 .. code-block:: console
 
-    pip install --upgrade build
-    python -m build
-    pip install ./dist/yarsync-0.2.1.tar.gz
+    pip install .
 
 Please make sure to run the tests and ensure you haven't broken anything before submitting a pull request.
 
@@ -221,12 +219,49 @@ Please make sure to run the tests and ensure you haven't broken anything before 
     # For a better verbose level
     pytest -vvv
 
-You can run tests on all supported python versions by simply running in your venv ``tox``.
-Please make sure to have installed some supported python versions beforehand (At least two for tox to be useful).
+You can run tests on all supported Python versions by simply running ``tox`` in your virtual environment.
+Make sure to have installed some supported Python versions beforehand (at least two for ``tox`` to be useful).
 
 .. code-block:: console
 
     tox
+
+Tools you may like to use
+=========================
+
+A linter, like `pylint <https://github.com/pylint-dev/pylint>`_ or `ruff <https://docs.astral.sh/ruff/>`_, can improve the quality of your code.
+
+A dependency manager (like `uv <https://docs.astral.sh/uv/>`_) permits one to easily code in several Python versions and manage virtual environments.
+
+These are the most basic commands associated with uv.
+
+``uv tool install tox --with tox-uv``
+
+``uv tool install ruff``
+
+``uv python install 3.13``
+
+``uv python pin 3.13``
+
+``uv sync``
+
+``uv run -- yarsync``
+
+You can also directly enter a venv with
+
+``uv venv``
+
+``uv`` can be really useful when combined with `tox` because it will automatically create the required virtualenvs, install the required version, and install for each versions its dependencies before running the tests for all python versions.
+
+.. code-block:: console
+
+    # first, make sure you have uv installed.
+    # you then need to install tox with the tox-uv plugin.
+    uv tool install tox --with tox-uv
+    # You will maybe need to enable tox-uv in the pyproject.toml file.
+    # Finally, you can just run tox and it will do the rest.
+    tox
+
 
 ------
 Thanks
