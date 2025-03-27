@@ -1,7 +1,100 @@
-# If tox fails, remove this file.
+# ----------------
+# Building section
+# ----------------
+
 [build-system]
-requires = ["setuptools"]
-# for setuptools==60.10.0 it works (can't say the minimal version)
+requires = ["setuptools>=61.0.0"]
+# https://setuptools.pypa.io/en/latest/history.html#v61-0-0
+# Because python3.6 is stuck with setuptools 59.6.0, works only for python>=3.7
 build-backend = "setuptools.build_meta"
-# todo: probably move setup.py configuration here,
-# https://packaging.python.org/en/latest/tutorials/packaging-projects/#configuring-metadata
+
+[tool.setuptools.packages.find]
+exclude = ["tests", "tests.*"]
+
+# This is the entry-point
+# https://setuptools.pypa.io/en/latest/userguide/entry_point.html
+[project.scripts]
+yarsync = "yarsync.yarsync:main"
+
+# ----------------
+# Metadata section
+# ----------------
+
+[project]
+name = "yarsync"
+authors=[{name="Yaroslav Nikitenko",email="metst13@gmail.com"}]
+description = "Yet Another Rsync is a file synchronization and backup tool"
+keywords=["distributed", "file", "synchronization", "rsync", "backup"]
+readme = "README.rst"
+requires-python = ">=3.6"
+license = {text = 'GPLv3'}
+classifiers=[
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console", 
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: System :: Archiving",
+    "Topic :: System :: Archiving :: Backup",
+    "Topic :: System :: Archiving :: Mirroring",
+    "Topic :: Utilities",
+]
+dynamic = ["version"]
+dependencies = []
+
+[project.urls]
+Documentation = 'https://yarsync.readthedocs.io'
+Source = 'https://github.com/ynikitenko/yarsync'
+Tracker = 'https://github.com/ynikitenko/yarsync/issues'
+
+# https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html#dynamic-metadata
+[tool.setuptools.dynamic]
+version = {attr = "yarsync.version.__version__"}
+
+
+# ---------------------------------
+# Development / dependencies section
+# ---------------------------------
+
+[project.optional-dependencies]
+documentation = [
+    "furo",
+    "myst-parser",
+    "sphinx",
+]
+
+[dependency-groups]
+dev = [
+    "pip",
+    "coverage",
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+    "tox",
+]
+
+# ----------------------
+# Tox tool configuration
+# ----------------------
+
+[tool.tox]
+requires = ["tox>=3.28.0"]
+env_list = ["3.7","3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "pypy3"]
+
+[tool.tox.env_run_base]
+description = "Run test under {base_python}"
+commands = [["pytest", "{posargs}"]]
+# Activate the following line in case you wish to use tox with uv
+#runner = "uv-venv-lock-runner"

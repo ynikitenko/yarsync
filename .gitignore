@@ -5,4 +5,5 @@ dist/
 .tox
 tests/.hypothesis/
 docs/build
+build
 **/__pycache__/
