@@ -203,12 +203,15 @@ You can use a virtual environment in order to avoid messing with your system whi
 
     python3 -m venv ~/.venv/yarsync_dev
     source ~/.venv/yarsync_dev/bin/activate
-    pip install -r requirements.txt
+    mkdir tmp && cd tmp
+    git clone https://github.com/ynikitenko/yarsync
 
-To build and then install ``yarsync``, run the next command while being in the root of the repository:
+To build and then install ``yarsync``, run the following commands from the root of the repository:
 
 .. code-block:: console
 
+    cd yarsync
+    pip install -r requirements.txt
     pip install .
 
 Please make sure to run the tests and ensure you haven't broken anything before submitting a pull request.
@@ -216,8 +219,8 @@ Please make sure to run the tests and ensure you haven't broken anything before 
 .. code-block:: console
 
     pytest
-    # For a better verbose level
-    pytest -vvv
+    # Or, for a more verbose level
+    # pytest -vvv
 
 You can run tests on all supported Python versions by simply running ``tox`` in your virtual environment.
 Make sure to have installed some supported Python versions beforehand (at least two for ``tox`` to be useful).
@@ -225,6 +228,8 @@ Make sure to have installed some supported Python versions beforehand (at least 
 .. code-block:: console
 
     tox
+
+After all tests you can remove the created directories or leave them for future tests.
 
 Tools you may like to use
 =========================
