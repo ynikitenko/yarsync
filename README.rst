@@ -203,6 +203,7 @@ You can use a virtual environment in order to avoid messing with your system whi
 
     python3 -m venv ~/.venv/yarsync_dev
     source ~/.venv/yarsync_dev/bin/activate
+    # download a clean repository, or use the existing one with your changes
     mkdir tmp && cd tmp
     git clone https://github.com/ynikitenko/yarsync
 
