@@ -23,15 +23,10 @@ For an installation `from PyPI <https://pypi.org/project/yarsync/>`_, run
 
     pip3 install yarsync
 
-If you don't want to have it installed system widely (e.g. for testing), you can also install ``yarsync`` in a venv
+If you don't want to install it system-wide (e.g. for testing), see installation in a virtual environment in the
+`Developing <#developing-contributing>`_ section.
 
-.. code-block:: console
-
-    python3 -m venv ~/.venv/yarsync
-    source ~/.venv/yarsync/bin/activate
-    pip install yarsync
-
-For macOS ventura installation, the built-in rsync in macOS is version 2.6.9, yarsync requires a new version of rsync, run
+For macOS Ventura the built-in version of ``rsync`` in macOS is 2.6.9, while ``yarsync`` requires a newer one. Run
 
 .. code-block:: console
 
@@ -184,6 +179,9 @@ Documentation
 For the complete documentation, read the installed
 or online `manual <https://yarsync.readthedocs.io/en/latest/yarsync.1.html>`_.
 
+A 10-minute `video <https://www.youtube.com/watch?v=1qRZ1mIuD3U>`_ with motivation, implementation ideas and overview
+of the tool (and 6 minutes more for questions) was recorded during a conference in 2024.
+
 For more in-depth topics or alternatives, see
 `details <https://yarsync.readthedocs.io/en/latest/details.html>`_.
 
@@ -193,9 +191,9 @@ On github pages there is the manual for `yarsync 0.1 <https://ynikitenko.github.
 An article in Russian that deals more with ``yarsync`` internals was posted
 on `Habr <https://habr.com/ru/post/662163/>`_.
 
----------------------------------
-Development / Contributing notes
----------------------------------
+--------------------------
+Developing / Contributing
+--------------------------
 
 You can use a virtual environment in order to avoid messing with your system while working on ``yarsync``:
 
@@ -220,7 +218,7 @@ Please make sure to run the tests and ensure you haven't broken anything before 
 .. code-block:: console
 
     pytest
-    # Or, for a more verbose level
+    # Or for a more verbose level
     # pytest -vvv
 
 You can run tests on all supported Python versions by simply running ``tox`` in your virtual environment.
