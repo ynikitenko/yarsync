@@ -1,4 +1,44 @@
 ===========================
+YARsync 0.3
+===========================
+YARsync minor release 0.3 was done on March 28, 2025.
+
+This release does not add much functionality, but fixes several bugs
+and improves documentation and technical features of the project.
+
+What's new
+----------
+
+* *clone* command gets a ``--force`` option.
+
+Bug fixes
+---------
+
+* Fixes some bugs in *clone_from* and *show* connected with the synchronisation directory.
+
+Documentation
+-------------
+
+* Adds a *Developing and Contributing* section.
+* Updates tips on using virtual environment.
+
+Technical changes
+-----------------
+
+* Adds *pyproject.toml* instead of *setup.py*, as is required by modern Python packaging.
+* Updates tests to run for Python 3.13.
+* Linted out many unused imports in test files.
+* This is the last release tested with Python 3.6.
+
+Publicity
+---------
+
+*yarsync* was presented in August 2024 at a conference of Python developers in high energy physics,
+PyHEP.dev 2024.
+A `video <https://www.youtube.com/watch?v=1qRZ1mIuD3U>`_ was recorded and published on YouTube (link added to the README).
+
+
+===========================
 YARsync 0.2.1
 ===========================
 YARsync patch release 0.2.1 was done on 28 March 2023.
@@ -102,7 +142,7 @@ Documentation has been moved to Read the Docs.
 * Tests improvements:
 
   * Adds *helpers.py* (for cloning test repositories).
-  * Fixes hardlink fixtures. 
+  * Fixes hardlink fixtures.
 
 * Implements ``init`` *--merge* option. It is not tested and shall be added in the next release.
 * *_print_command* accepts lists and properly escapes commands with spaces.

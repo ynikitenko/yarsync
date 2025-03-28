@@ -1,6 +1,6 @@
-% YARSYNC(1) yarsync 0.2.2 | YARsync Manual
+% YARSYNC(1) yarsync 0.3 | YARsync Manual
 % Written by Yaroslav Nikitenko
-% March 2023
+% March 2025
 
 # NAME
 yarsync - a file synchronization and backup tool
@@ -740,7 +740,7 @@ Please report any bugs or make feature requests to
 <https://github.com/ynikitenko/yarsync/issues>.
 
 # COPYRIGHT
-Copyright © 2021-2023 Yaroslav Nikitenko.
+Copyright © 2021-2025 Yaroslav Nikitenko.
 License GPLv3: GNU GPL version 3 <https://gnu.org/licenses/gpl.html>.\
 This is free software: you are free to change and redistribute it. There is NO
 WARRANTY, to the extent permitted by law.

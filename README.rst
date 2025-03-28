@@ -24,7 +24,7 @@ For an installation `from PyPI <https://pypi.org/project/yarsync/>`_, run
     pip3 install yarsync
 
 If you don't want to install it system-wide (e.g. for testing), see installation in a virtual environment in the
-`Developing <#developing-contributing>`_ section.
+`Developing <#developing-and-contributing>`_ section.
 
 For macOS Ventura the built-in version of ``rsync`` in macOS is 2.6.9, while ``yarsync`` requires a newer one. Run
 
@@ -191,9 +191,9 @@ On github pages there is the manual for `yarsync 0.1 <https://ynikitenko.github.
 An article in Russian that deals more with ``yarsync`` internals was posted
 on `Habr <https://habr.com/ru/post/662163/>`_.
 
---------------------------
-Developing / Contributing
---------------------------
+---------------------------
+Developing and contributing
+---------------------------
 
 You can use a virtual environment in order to avoid messing with your system while working on ``yarsync``:
 
@@ -201,7 +201,7 @@ You can use a virtual environment in order to avoid messing with your system whi
 
     python3 -m venv ~/.venv/yarsync_dev
     source ~/.venv/yarsync_dev/bin/activate
-    # download a clean repository, or use the existing one with your changes
+    # download a clean repository or use the existing one with your changes
     mkdir tmp && cd tmp
     git clone https://github.com/ynikitenko/yarsync
 
@@ -218,7 +218,7 @@ Please make sure to run the tests and ensure you haven't broken anything before 
 .. code-block:: console
 
     pytest
-    # Or for a more verbose level
+    # Or to increase verbosity level
     # pytest -vvv
 
 You can run tests on all supported Python versions by simply running ``tox`` in your virtual environment.
