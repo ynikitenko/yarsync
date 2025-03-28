@@ -197,36 +197,40 @@ on `Habr <https://habr.com/ru/post/662163/>`_.
 Development / Contributing notes
 ---------------------------------
 
-Please use a virtualenv in order to avoid messing with your system while working on ``yarsync``.
+You can use a virtual environment in order to avoid messing with your system while working on ``yarsync``:
 
 .. code-block:: console
 
     python3 -m venv ~/.venv/yarsync_dev
     source ~/.venv/yarsync_dev/bin/activate
-    pip install -r requirements.txt
+    # download a clean repository, or use the existing one with your changes
+    mkdir tmp && cd tmp
+    git clone https://github.com/ynikitenko/yarsync
 
-To build and then install ``yarsync``, run the following commands.
+To build and then install ``yarsync``, run the following commands from the root of the repository:
 
 .. code-block:: console
 
-    pip install --upgrade build
-    python -m build
-    pip install ./dist/yarsync-0.2.1.tar.gz
+    cd yarsync
+    pip install -r requirements.txt
+    pip install .
 
 Please make sure to run the tests and ensure you haven't broken anything before submitting a pull request.
 
 .. code-block:: console
 
     pytest
-    # For a better verbose level
-    pytest -vvv
+    # Or, for a more verbose level
+    # pytest -vvv
 
-You can run tests on all supported python versions by simply running in your venv ``tox``.
-Please make sure to have installed some supported python versions beforehand (At least two for tox to be useful).
+You can run tests on all supported Python versions by simply running ``tox`` in your virtual environment.
+Make sure to have installed some supported Python versions beforehand (at least two for ``tox`` to be useful).
 
 .. code-block:: console
 
     tox
+
+After all tests you can remove the created directories or leave them for future tests.
 
 ------
 Thanks
