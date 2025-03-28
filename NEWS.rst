@@ -30,6 +30,19 @@ Technical changes
 * Linted out many unused imports in test files.
 * This is the last release tested with Python 3.6.
 
+
+Community
+---------
+
+This release is mostly due to [statzitz](https://github.com/statzitz),
+who updated tests to work with the recent Python version (a serious bug which prevented many users to use the tool;
+thanks to complaints from AUR users as well) and added many documentation improvements.
+
+Also thanks to [Lin, Yong Xiang](https://github.com/r888800009) for several bug reports and useful discussions.
+
+Today the project has 39 stars on GitHub and 3 contributors, which looks rather popular for me
+and inspires its better support and development.
+
 Publicity
 ---------
 

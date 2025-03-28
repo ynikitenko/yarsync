@@ -236,6 +236,10 @@ Thanks
 
 A good number of people have contributed to the improvement of this software.
 I'd like to thank
+(in most recent order):
+*statzitz* for great help with updating tests for release *v0.3*, documentation and configuration,
+Yong Xiang Lin for several bug reports and useful discussions,
+Arch Linux users for their notifications and improvements of my PKGBUILD,
 Nilson Silva for packaging ``yarsync`` for Debian,
 Mikhail Zelenyy from MIPT NPM for the explanation of
 Python `entry points <https://npm.mipt.ru/youtrack/articles/GENERAL-A-87/>`_,
