@@ -1,4 +1,4 @@
-% YARSYNC(1) yarsync 0.2.1 | YARsync Manual
+% YARSYNC(1) yarsync 0.2.2 | YARsync Manual
 % Written by Yaroslav Nikitenko
 % March 2023
 

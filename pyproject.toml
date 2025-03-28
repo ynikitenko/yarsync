@@ -1,11 +1,11 @@
-# ----------------
-# Building section
-# ----------------
+# ----- #
+# Build #
+# ----- #
 
 [build-system]
 requires = ["setuptools>=61.0.0"]
 # https://setuptools.pypa.io/en/latest/history.html#v61-0-0
-# Because python3.6 is stuck with setuptools 59.6.0, works only for python>=3.7
+# Since Python 3.6 is stuck with setuptools 59.6.0, it works only for python>=3.7
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
@@ -16,9 +16,9 @@ exclude = ["tests", "tests.*"]
 [project.scripts]
 yarsync = "yarsync.yarsync:main"
 
-# ----------------
-# Metadata section
-# ----------------
+# -------- #
+# Metadata #
+# -------- #
 
 [project]
 name = "yarsync"
@@ -27,13 +27,13 @@ description = "Yet Another Rsync is a file synchronization and backup tool"
 keywords=["distributed", "file", "synchronization", "rsync", "backup"]
 readme = "README.rst"
 requires-python = ">=3.6"
-license = {text = 'GPLv3'}
+license = "GPL-3.0"
+license-files = ["LICENSE"]
 classifiers=[
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console", 
     "Intended Audience :: End Users/Desktop",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.6",
@@ -63,10 +63,9 @@ Tracker = 'https://github.com/ynikitenko/yarsync/issues'
 [tool.setuptools.dynamic]
 version = {attr = "yarsync.version.__version__"}
 
-
-# ---------------------------------
-# Development / dependencies section
-# ---------------------------------
+# -------------------------- #
+# Development / dependencies #
+# -------------------------- #
 
 [project.optional-dependencies]
 documentation = [
@@ -85,12 +84,13 @@ dev = [
     "tox",
 ]
 
-# ----------------------
-# Tox tool configuration
-# ----------------------
+# ----------------- #
+# Tox configuration #
+# ----------------- #
 
 [tool.tox]
 requires = ["tox>=3.28.0"]
+# Python 3.6 was tested separately.
 env_list = ["3.7","3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "pypy3"]
 
 [tool.tox.env_run_base]

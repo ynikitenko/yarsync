@@ -1,3 +1,4 @@
+# setup.py is outdated and shall be removed in the next release.
 import setuptools
 
 
