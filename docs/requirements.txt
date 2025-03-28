@@ -1,0 +1,5 @@
+sphinx
+# to use Markdown with Sphinx
+myst-parser
+# sphinx theme
+furo

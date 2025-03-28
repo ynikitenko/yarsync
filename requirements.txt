@@ -4,9 +4,3 @@ coverage
 pytest-cov
 pytest-mock
 tox
-## documentation
-sphinx
-# to use Markdown with Sphinx
-myst-parser
-# sphinx theme
-furo
