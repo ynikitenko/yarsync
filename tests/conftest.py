@@ -113,3 +113,8 @@ def test_dir_read_only():
     yield TEST_DIR_READ_ONLY
     # tear down
     os.chmod(TEST_DIR_READ_ONLY, 0o755)
+
+
+@pytest.fixture(autouse=True)
+def disable_colors(monkeypatch):
+    monkeypatch.setenv("PYTHON_COLORS", "0")
