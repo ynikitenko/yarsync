@@ -28,7 +28,7 @@ setuptools.setup(
         'Tracker': 'https://github.com/ynikitenko/yarsync/issues',
     },
     keywords="distributed, file, synchronization, rsync, backup",
-    packages=setuptools.find_packages(exclude=['tests', 'tests.*']),
+    packages=setuptools.find_packages(include=["yarsync", "yarsync.*"]),
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Environment :: Console", 
