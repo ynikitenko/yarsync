@@ -3,6 +3,7 @@ import pytest
 import time
 
 from yarsync import YARsync
+from .helpers import mock_compare
 from .settings import TEST_DIR, TEST_DIR_EMPTY
 
 
@@ -28,13 +29,16 @@ def test_log_empty(mocker):
     res = ys()
     call = mocker.call
     assert res == 0
-    assert mocker_print.mock_calls == [
-        call.write('No synchronization directory found.'),
-        call.write('\n'),
-        call.write('No synchronization information found.'),
-        call.write('\n'),
-        call.write('No commits found'), call.write('\n')
-    ]
+    assert mock_compare(
+        mocker_print.mock_calls,
+        [
+            call.write('No synchronization directory found.'),
+            call.write('\n'),
+            call.write('No synchronization information found.'),
+            call.write('\n'),
+            call.write('No commits found'), call.write('\n')
+        ]
+    )
 
 
 def test_log(mocker):
@@ -59,27 +63,30 @@ def test_log(mocker):
     # this time is fixed in log
     time2_str = "Thu, 01 Jan 1970 03:00:02 MSK"
 
-    assert mocker_print.mock_calls == [
-        # todo: missing synchronization should be tested somewhere.
-        # call.write('No synchronization directory found.'),
-        # call.write('\n'),
-        # call.write('No synchronization information found.'),
-        # call.write('\n'),
-        call.write('commit 3 is missing'),
-        call.write('\n'),
-        call.write('log 3\n'),
-        call.write(''),
-        call.write('\n'),
-        call.write('commit 2 <-> other_repo'),
-        call.write('\n'),
-        call.write('When: {}\nWhere: user@host\n'.format(time2_str)),
-        call.write(''),
-        call.write('\n'),
-        call.write('commit 1'),
-        call.write('\n'),
-        call.write('Log is missing\nWhen: {}\n'.format(time1_str)),
-        call.write(''),
-    ]
+    assert mock_compare(
+        mocker_print.mock_calls,
+        [
+            # todo: missing synchronization should be tested somewhere.
+            # call.write('No synchronization directory found.'),
+            # call.write('\n'),
+            # call.write('No synchronization information found.'),
+            # call.write('\n'),
+            call.write('commit 3 is missing'),
+            call.write('\n'),
+            call.write('log 3\n'),
+            call.write(''),
+            call.write('\n'),
+            call.write('commit 2 <-> other_repo'),
+            call.write('\n'),
+            call.write('When: {}\nWhere: user@host\n'.format(time2_str)),
+            call.write(''),
+            call.write('\n'),
+            call.write('commit 1'),
+            call.write('\n'),
+            call.write('Log is missing\nWhen: {}\n'.format(time1_str)),
+            call.write(''),
+        ]
+    )
 
     mocker_print.reset_mock()
     # yarsync log -n 1 -r
@@ -88,16 +95,19 @@ def test_log(mocker):
     res = ys()
     call = mocker.call
     assert res == 0
-    assert mocker_print.mock_calls == [
-        # call.write('No synchronization directory found.'),
-        # call.write('\n'),
-        # call.write('No synchronization information found.'),
-        # call.write('\n'),
-        call.write('commit 1'),
-        call.write('\n'),
-        call.write('Log is missing\nWhen: {}\n'.format(time1_str)),
-        call.write(''),
-    ]
+    assert mock_compare(
+        mocker_print.mock_calls,
+        [
+            # call.write('No synchronization directory found.'),
+            # call.write('\n'),
+            # call.write('No synchronization information found.'),
+            # call.write('\n'),
+            call.write('commit 1'),
+            call.write('\n'),
+            call.write('Log is missing\nWhen: {}\n'.format(time1_str)),
+            call.write(''),
+        ]
+    )
 
 
 def test_make_commit_log_list():

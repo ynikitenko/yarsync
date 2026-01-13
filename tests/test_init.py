@@ -7,6 +7,7 @@ from sys import version_info
 from yarsync import YARsync
 from yarsync.yarsync import CONFIG_EXAMPLE
 
+from .helpers import mock_compare
 from .settings import YSDIR
 
 
@@ -41,24 +42,11 @@ def test_init_mixed(mocker):
     assert res == 0
 
     call = mocker.call
-    if version_info.minor >= 13:
-        assert m.mock_calls == [
-            # call(conffile, "w"), call().__enter__(),
-            # call().write(CONFIG_EXAMPLE), call().write(''),
-            # call().__exit__(None, None, None),
-            call(repofile, "x"), call().__enter__(),
-            call().__exit__(None, None, None),
-            call().close()
-        ]
-    else:
-        assert m.mock_calls == [
-            # call(conffile, "w"), call().__enter__(),
-            # call().write(CONFIG_EXAMPLE), call().write(''),
-            # call().__exit__(None, None, None),
-            call(repofile, "x"), call().__enter__(),
-            call().__exit__(None, None, None)
-        ]
-    # old_calls = m.mock_calls[:]
+    # if version_info.minor >= 13, there is also call().close()
+    assert mock_compare(
+        m.mock_calls,
+        [call(repofile, "x")]
+    )
 
     # clear the calls
     m.reset_mock()
@@ -71,7 +59,11 @@ def test_init_mixed(mocker):
     ys1._init()
 
     repofile = ys1.REPOFILE.format("my_host")
-    assert call(repofile, "x") in m.mock_calls
+    # assert call(repofile, "x") in m.mock_calls
+    assert mock_compare(
+        m.mock_calls,
+        [call(repofile, "x")]
+    )
 
 
 def test_init_non_existent(mocker):
@@ -92,29 +84,21 @@ def test_init_non_existent(mocker):
     res = ys()
     assert res == 0
     call = mocker.call
-    assert mkdir.mock_calls == [call(YSDIR)]
+    assert mock_compare(mkdir.mock_calls, [call(YSDIR)])
     # assert mkdir.mock_calls == [call(YSDIR, ys.DIRMODE)]
 
-    if version_info.minor >= 13:
-        assert m.mock_calls == [
+    # if version_info.minor >= 13, also call().close(),
+    assert mock_compare(
+        m.mock_calls,
+        [
             # mkdir is recorded separately
-            call(conffile, "w"), call().__enter__(),
+            call(conffile, "w"),
             call().write(CONFIG_EXAMPLE), call().write(''),
-            call().__exit__(None, None, None),
             call().close(),
-            call(repofile, "x"), call().__enter__(),
-            call().__exit__(None, None, None),
+            call(repofile, "x"),
             call().close(),
         ]
-    else:
-        assert m.mock_calls == [
-            # mkdir is recorded separately
-            call(conffile, "w"), call().__enter__(),
-            call().write(CONFIG_EXAMPLE), call().write(''),
-            call().__exit__(None, None, None),
-            call(repofile, "x"), call().__enter__(),
-            call().__exit__(None, None, None)
-        ]
+    )
 
 
 def test_init_existent(mocker):
@@ -141,6 +125,7 @@ def test_init_existent(mocker):
 
     res = ys()
     assert res == 0
+    # todo: use mock_compare if these fail in future Python versions
     assert input_.mock_calls == []
     assert mkdir.mock_calls == []
     assert m.mock_calls == []

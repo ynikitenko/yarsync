@@ -6,6 +6,7 @@ from sys import version_info
 
 from yarsync import YARsync
 
+from .helpers import mock_compare
 from .settings import TEST_DIR_EMPTY, YSDIR
 
 
@@ -70,13 +71,15 @@ def test_commit(mocker):
     call = mocker.call
 
     assert res == 0
-    assert mkdir.mock_calls == [
-        call(ys.COMMITDIR),
-        call(ys.LOGDIR),
-    ]
+    assert mock_compare(
+        mkdir.mock_calls,
+        [call(ys.COMMITDIR), call(ys.LOGDIR),]
+    )
+    # todo: use mock_compare if they fail for future Python versions
     assert rename.mock_calls == [
         call(commit_dir_tmp, commit_dir),
     ]
+    # todo: use mock_compare if they fail for future Python versions
     assert popen.mock_calls == [
         call(["rsync", "-a", "--link-dest=../../..", "--exclude=/.ys"]
              + filter_ +
@@ -93,36 +96,15 @@ def test_commit(mocker):
     # else:
     #     time_str = "Thu, 01 Jan 1970 03:00:03 MSK"
     time_str = time.strftime(ys.DATEFMT, time.localtime(3))
-    
-    if version_info.minor >= 13:
-        assert m.mock_calls == [
-            # call(ys.REPOFILE),
-            # call().__enter__(),
-            # call().read(),
-            # call().__exit__(None, None, None),
-            # call(commit_log_path, "w"),
-            call().__enter__(),
+    assert mock_compare(
+        m.mock_calls,
+        [
             call().write(commit_msg + "\n\n"
                          "When: {}\n".format(time_str) +
                          "Where: user@myhost"),
             call().write('\n'),
-            call().__exit__(None, None, None),
-            call().close(),
         ]
-    else:
-        assert m.mock_calls == [
-            # call(ys.REPOFILE),
-            # call().__enter__(),
-            # call().read(),
-            # call().__exit__(None, None, None),
-            # call(commit_log_path, "w"),
-            call().__enter__(),
-            call().write(commit_msg + "\n\n"
-                         "When: {}\n".format(time_str) +
-                         "Where: user@myhost"),
-            call().write('\n'),
-            call().__exit__(None, None, None),
-        ]
+    )
 
 
 @pytest.mark.parametrize("commit_time", [4, 0])

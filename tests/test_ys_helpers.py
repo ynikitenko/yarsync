@@ -9,6 +9,7 @@ from yarsync.yarsync import (
     CONFIG_EXAMPLE, YSConfigurationError
 )
 
+from .helpers import mock_compare
 from .settings import TEST_DIR
 
 
@@ -131,32 +132,37 @@ def test_print(mocker):
     assert ys.print_level == ys._default_print_level
 
     ys._print("debug", level=2)
-    assert mocker_print.mock_calls == [
-        call.write('debug'), call.write('\n')
-    ]
+    assert mock_compare(
+        mocker_print.mock_calls,
+        [call.write('debug'), call.write('\n')]
+    )
     mocker_print.reset_mock()
 
     # verbose
     args = ["yarsync", "-v", "log"]
     ys = YARsync(args)
     ys._print("debug", level=3)
-    assert mocker_print.mock_calls == [
-        call.write('# '), call.write(''), call.write('debug'), call.write('\n')
-    ]
+    assert mock_compare(
+        mocker_print.mock_calls,
+        [call.write('# '), call.write(''), call.write('debug'), call.write('\n')]
+    )
     mocker_print.reset_mock()
 
     # decrease verbosity
     ys.print_level = 1
 
     ys._print("general")
-    assert mocker_print.mock_calls == [
-        call.write('general'), call.write('\n')
-    ]
+    assert mock_compare(
+        mocker_print.mock_calls,
+        [call.write('general'), call.write('\n')]
+    )
     mocker_print.reset_mock()
 
     # print level higher than that of the YARsync object
     ys._print("debug unavailable", level=2)
-    assert mocker_print.mock_calls == []
+    assert mock_compare(
+        mocker_print.mock_calls, []
+    )
 
 
 def test_print_command(capfd):

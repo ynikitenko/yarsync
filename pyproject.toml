@@ -96,8 +96,9 @@ dev = [
 
 [tool.tox]
 requires = ["tox>=3.28.0"]
-# Python 3.6 was tested separately.
-env_list = ["3.7","3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "pypy3"]
+# todo: Python 3.6 has to be typed like that on Manjaro (still using an AUR package).
+# This looks flaky and should be probably fixed in the future.
+env_list = ["python3.6", "3.7","3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "pypy3"]
 
 [tool.tox.env_run_base]
 description = "Run test under {base_python}"

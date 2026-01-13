@@ -3,6 +3,7 @@ import pytest
 
 from yarsync import YARsync
 from yarsync.yarsync import _Sync
+from .helpers import mock_compare
 from .settings import (
     TEST_DIR, TEST_DIR_EMPTY, TEST_DIR_CONFIG_DIR, TEST_DIR_WORK_DIR, TEST_DIR_FILTER,
     TEST_DIR_YS_BAD_PERMISSIONS,
@@ -32,17 +33,7 @@ def test_status_error(mocker, test_dir_read_only):
         "! fatal: no yarsync configuration directory .ys found\n"
     )
     # no stdout output
-    assert mocker_stdout.mock_calls == []
-
-    # don't test for exact messages,
-    # because we might improve them in the future.
-    # assert mocker_print.mock_calls == [
-    #     call.write('!'),
-    #     call.write(' '),
-    #     call.write("fatal: no yarsync configuration "
-    #                ".ys found"),
-    #     call.write('\n')
-    # ]
+    assert mock_compare(mocker_stdout.mock_calls, [])
 
 
 def test_status_error_bad_permissions(capfd):
@@ -72,10 +63,13 @@ def test_status_no_commits(mocker):
     res = ys()
     call = mocker.call
     assert res == 0
-    assert mocker_print.mock_calls == [
-        call.write('In repository myhost'), call.write('\n'),
-        call.write('No commits found'), call.write('\n')
-    ]
+    assert mock_compare(
+            mocker_print.mock_calls,
+            [
+                call.write('In repository myhost'), call.write('\n'),
+                call.write('No commits found'), call.write('\n')
+            ]
+    )
 
 
 @pytest.mark.parametrize(
