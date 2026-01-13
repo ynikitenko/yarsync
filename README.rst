@@ -120,10 +120,9 @@ safe
   Removed files are stored in older commits
   (until the user explicitly removes those).
 
-..
-  If a file gets corrupt, it will not be transferred by default,
-  but when the user chooses to *pull --backup*, any diverged files will be visible
-  (with their different versions preserved).
+  WARNING: ``yarsync`` works for unchanged files by default. If a file was changed (corrupted),
+  synchronisation will propagate that for every hard link. See safety_ below.
+
 
 ---------
 Commands
@@ -155,14 +154,14 @@ this means that it can easily run on any UNIX-like system.
 Moreover, ``yarsync`` is not required to be installed on the remote host:
 it is sufficient for ``rsync`` to be installed there.
 
-In particular, ``rsync`` can be found:
+``yarsync`` has been extensively tested on GNU/Linux distributions, and it has been successfully used on:
 
-* installed on most GNU/Linux distributions,
-* installed on `Mac OS <https://eshop.macsales.com/blog/45185-mac-101-learn-the-power-of-rsync-for-backup-remote-archive-systems/>`_,
-* can be installed on `Windows <https://superuser.com/questions/300263/how-to-use-rsync-from-windows-pc-to-remote-linux-server>`_.
+* `Mac OS <https://eshop.macsales.com/blog/45185-mac-101-learn-the-power-of-rsync-for-backup-remote-archive-systems/>`_,
+* `Windows <https://superuser.com/questions/300263/how-to-use-rsync-from-windows-pc-to-remote-linux-server>`_ with WSL.
 
-``yarsync`` runs successfully on Linux.
-Please report to us if you have problems (or success) running it on your system.
+If it ever fails on your specific system, please inform us. Patches are welcome.
+
+.. _safety:
 
 -------
 Safety
@@ -171,6 +170,13 @@ Safety
 However, any data synchronization may lead to data loss,
 and it is recommended to have several data copies
 and always do a *--dry-run* (*-n*) first before the actual transfer.
+
+See the open `issues <https://github.com/ynikitenko/yarsync/issues?q=state%3Aopen%20label%3A%22safety%22>`_ on safety.
+
+..
+  If a file gets corrupt, it will not be transferred by default,
+  but when the user chooses to *pull --backup*, any diverged files will be visible
+  (with their different versions preserved).
 
 -------------
 Documentation
@@ -273,7 +279,9 @@ Thanks
 A good number of people have contributed to the improvement of this software.
 I'd like to thank
 (in most recent order):
-*statzitz* for great help with updating tests for release *v0.3*, documentation and configuration,
+AUR user Simona for reporting an issue, Colin Watson for reporting a similar issue and fixing a packaging bug
+and *statzitz* for extending documentation for release *v0.3.2*,
+*statzitz* for great help with updating tests for release *v0.3.1*, documentation and configuration,
 Yong Xiang Lin for several bug reports and useful discussions,
 Arch Linux users for their notifications and improvements of my PKGBUILD,
 Nilson Silva for packaging ``yarsync`` for Debian,
