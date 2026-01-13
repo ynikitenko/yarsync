@@ -1,3 +1,5 @@
+See most recent release history on https://github.com/ynikitenko/yarsync/releases.
+
 ===========================
 YARsync 0.3
 ===========================

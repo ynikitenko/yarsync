@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.abspath('../../'))
 from yarsync.version import __version__
 
 project = 'YARsync'
-copyright = '2021-2025, Yaroslav Nikitenko'
+copyright = '2021-2026, Yaroslav Nikitenko'
 author = 'Yaroslav Nikitenko'
 release = __version__
 
