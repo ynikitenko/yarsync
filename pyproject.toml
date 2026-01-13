@@ -49,6 +49,7 @@ classifiers=[
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
     "Topic :: System :: Archiving",
@@ -96,10 +97,11 @@ dev = [
 [tool.tox]
 requires = ["tox>=3.28.0"]
 # Python 3.6 was tested separately.
-env_list = ["3.7","3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "pypy3"]
+env_list = ["3.7","3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "pypy3"]
 
 [tool.tox.env_run_base]
 description = "Run test under {base_python}"
 commands = [["pytest", "{posargs}"]]
+allowlist_externals=["pytest"]
 # Activate the following line in case you wish to use tox with uv
 #runner = "uv-venv-lock-runner"
